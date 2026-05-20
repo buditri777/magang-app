@@ -13,11 +13,16 @@ Status: 🟢 done · 🟡 in-progress · 🔴 pending · ⚪ optional
 
 - 🟢 Backend Express + Prisma + MySQL (10 tabel, seed admin)
 - 🟢 Auth: login, JWT, must-change-password flow
-- 🟢 Routes: auth, admin (users CRUD), applications, companies, dosen
+- 🟢 Routes: auth, admin (users CRUD + create manual), applications (full workflow), companies, dosen
+- 🟢 Letter generation engine (single + multi template .docx)
+- 🟢 Email service (SMTP nodemailer) — welcome + reset password emails
 - 🟢 Frontend MUI Berry theme, Layout drawer + topbar
-- 🟢 Pages: Login (+ show password), ChangePassword, Admin (Dashboard/Users/Import), Mahasiswa (Dashboard/Apply/Applications), AdminUPI (Dashboard/Applications), Dosen (Dashboard)
+- 🟢 Pages: Login (+ show password), ChangePassword, Admin (Dashboard/Users+Dialog/Import), Mahasiswa (Dashboard/Apply/Applications+Download), AdminUPI (Dashboard/Applications+Review+Approve/Reject+Download Letter), Dosen (Dashboard+Mahasiswa Bimbingan)
+- 🟢 Notistack toast notifications (semua alert() diganti)
 - 🟢 Vercel deploy production + alias `magang-udb.vercel.app`
 - 🟢 Vercel proxy `/api/*` → backend VPS (fix mixed content)
+- 🟢 PM2 auto-restart backend
+- 🟢 Full E2E test passed (9/9): login → create user → change pw → apply → approve → generate letter
 
 ---
 
