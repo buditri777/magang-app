@@ -7,6 +7,7 @@ import {
   DialogActions, Alert, IconButton, Tooltip,
 } from '@mui/material';
 import { IconSearch, IconPlus, IconRefresh, IconCopy } from '@tabler/icons-react';
+import { useSnackbar } from 'notistack';
 import api from '../../lib/api';
 
 function CreateUserDialog({ open, onClose }) {
@@ -126,6 +127,7 @@ function CreateUserDialog({ open, onClose }) {
 
 export default function AdminUsers() {
   const queryClient = useQueryClient();
+  const { enqueueSnackbar } = useSnackbar();
   const [filters, setFilters] = useState({ role: '', status: '', search: '' });
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -136,12 +138,22 @@ export default function AdminUsers() {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, ...body }) => api.patch(`/admin/users/${id}`, body),
-    onSuccess: () => queryClient.invalidateQueries(['admin-users']),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['admin-users']);
+      enqueueSnackbar('Status user berhasil diupdate', { variant: 'success' });
+    },
+    onError: (e) => enqueueSnackbar(e.response?.data?.error || 'Gagal update', { variant: 'error' }),
   });
 
   const resetMutation = useMutation({
     mutationFn: (id) => api.post(`/admin/users/${id}/reset-password`),
-    onSuccess: (res) => alert(`Password direset: ${res.data.temp_password}`),
+    onSuccess: (res) => {
+      enqueueSnackbar(`Password direset: ${res.data.temp_password} (sudah dikirim ke email user)`, {
+        variant: 'success',
+        autoHideDuration: 8000,
+      });
+    },
+    onError: (e) => enqueueSnackbar(e.response?.data?.error || 'Gagal reset password', { variant: 'error' }),
   });
 
   const users = data?.users || [];
