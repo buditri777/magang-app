@@ -1,10 +1,16 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  Box, Typography, Card, CardContent, TextField, Button, Stack, Alert,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Divider, Grid, Stepper, Step, StepLabel,
+} from '@mui/material';
+import { IconSearch, IconPlus, IconArrowLeft } from '@tabler/icons-react';
 import api from '../../lib/api';
 
 export default function MahasiswaApply() {
   const navigate = useNavigate();
-  const [step, setStep] = useState(1); // 1: pilih perusahaan, 2: form pengajuan
+  const [step, setStep] = useState(0);
   const [search, setSearch] = useState('');
   const [companies, setCompanies] = useState([]);
   const [selectedCompany, setSelectedCompany] = useState(null);
@@ -12,11 +18,7 @@ export default function MahasiswaApply() {
   const [newCompany, setNewCompany] = useState({ name: '', address: '', city: '', contact: '' });
 
   const [form, setForm] = useState({
-    position: '',
-    division: '',
-    start_date: '',
-    end_date: '',
-    notes: '',
+    position: '', division: '', start_date: '', end_date: '', notes: '',
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -33,11 +35,11 @@ export default function MahasiswaApply() {
     try {
       const res = await api.post('/companies', newCompany);
       setSelectedCompany(res.data);
-      setStep(2);
+      setStep(1);
     } catch (err) {
       if (err.response?.status === 409) {
         setSelectedCompany(err.response.data.existing);
-        setError(`Perusahaan dengan nama serupa sudah ada: "${err.response.data.existing.name}". Silakan pilih perusahaan ini.`);
+        setError(`Perusahaan serupa sudah ada: "${err.response.data.existing.name}". Silakan pilih.`);
         searchCompanies();
       } else {
         setError(err.response?.data?.error || 'Gagal menambahkan perusahaan');
@@ -64,132 +66,144 @@ export default function MahasiswaApply() {
   };
 
   return (
-    <div>
-      <div className="page-header">
-        <h1>Ajukan Magang</h1>
-        <p>Isi form pengajuan surat pengantar magang</p>
-      </div>
+    <Box>
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h2">Ajukan Magang</Typography>
+        <Typography variant="body2" color="text.secondary">Isi form pengajuan surat pengantar magang</Typography>
+      </Box>
 
-      {error && <div className="alert alert-error">{error}</div>}
+      <Stepper activeStep={step} sx={{ mb: 3 }}>
+        <Step><StepLabel>Pilih Perusahaan</StepLabel></Step>
+        <Step><StepLabel>Detail Pengajuan</StepLabel></Step>
+      </Stepper>
 
-      {step === 1 && (
-        <div className="card">
-          <div className="card-header"><h2>Step 1: Pilih Perusahaan</h2></div>
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
-            <input
-              placeholder="Cari nama atau alamat perusahaan..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && searchCompanies()}
-              style={{ flex: 1, padding: '10px 14px', border: '1px solid #cbd5e1', borderRadius: '8px' }}
-            />
-            <button className="btn btn-primary" onClick={searchCompanies}>🔍 Cari</button>
-          </div>
+      {step === 0 && (
+        <Card>
+          <CardContent>
+            <Typography variant="h4" sx={{ mb: 2 }}>Cari Perusahaan</Typography>
+            <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Cari nama atau alamat perusahaan..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && searchCompanies()}
+              />
+              <Button variant="contained" startIcon={<IconSearch size={18} />} onClick={searchCompanies}>
+                Cari
+              </Button>
+            </Stack>
 
-          {companies.length > 0 && (
-            <div className="table-wrap">
-              <table>
-                <thead><tr><th>Nama</th><th>Alamat</th><th>Kota</th><th></th></tr></thead>
-                <tbody>
-                  {companies.map(c => (
-                    <tr key={c.id}>
-                      <td>{c.name}</td>
-                      <td>{c.address}</td>
-                      <td>{c.city}</td>
-                      <td>
-                        <button className="btn btn-sm btn-success" onClick={() => { setSelectedCompany(c); setStep(2); }}>
-                          Pilih
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+            {companies.length > 0 && (
+              <TableContainer sx={{ mb: 3 }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Nama</TableCell>
+                      <TableCell>Alamat</TableCell>
+                      <TableCell>Kota</TableCell>
+                      <TableCell></TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {companies.map(c => (
+                      <TableRow key={c.id} hover>
+                        <TableCell sx={{ fontWeight: 500 }}>{c.name}</TableCell>
+                        <TableCell>{c.address}</TableCell>
+                        <TableCell>{c.city}</TableCell>
+                        <TableCell>
+                          <Button size="small" variant="contained" color="success" onClick={() => { setSelectedCompany(c); setStep(1); }}>
+                            Pilih
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
 
-          <div style={{ marginTop: '20px', padding: '16px', background: '#f8fafc', borderRadius: '8px' }}>
-            <p style={{ marginBottom: '12px', color: '#64748b', fontSize: '0.9rem' }}>
-              Perusahaan tidak ditemukan? Tambahkan baru:
-            </p>
-            <button className="btn btn-secondary" onClick={() => setShowAddCompany(!showAddCompany)}>
-              {showAddCompany ? 'Tutup' : '+ Tambah Perusahaan Baru'}
-            </button>
+            <Divider sx={{ my: 2 }} />
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Perusahaan tidak ditemukan?
+            </Typography>
+            <Button variant="outlined" startIcon={<IconPlus size={18} />} onClick={() => setShowAddCompany(!showAddCompany)}>
+              {showAddCompany ? 'Tutup' : 'Tambah Perusahaan Baru'}
+            </Button>
 
             {showAddCompany && (
-              <div style={{ marginTop: '16px' }}>
-                <div className="form-group">
-                  <label>Nama Perusahaan *</label>
-                  <input value={newCompany.name} onChange={(e) => setNewCompany({ ...newCompany, name: e.target.value })} />
-                </div>
-                <div className="form-group">
-                  <label>Alamat *</label>
-                  <input value={newCompany.address} onChange={(e) => setNewCompany({ ...newCompany, address: e.target.value })} />
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div className="form-group">
-                    <label>Kota *</label>
-                    <input value={newCompany.city} onChange={(e) => setNewCompany({ ...newCompany, city: e.target.value })} />
-                  </div>
-                  <div className="form-group">
-                    <label>Kontak</label>
-                    <input value={newCompany.contact} onChange={(e) => setNewCompany({ ...newCompany, contact: e.target.value })} />
-                  </div>
-                </div>
-                <button className="btn btn-primary" onClick={addCompany}>
-                  Simpan & Lanjut
-                </button>
-              </div>
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
+                <Grid container spacing={2}>
+                  <Grid size={{ xs: 12 }}>
+                    <TextField fullWidth size="small" label="Nama Perusahaan *" value={newCompany.name} onChange={(e) => setNewCompany({ ...newCompany, name: e.target.value })} />
+                  </Grid>
+                  <Grid size={{ xs: 12 }}>
+                    <TextField fullWidth size="small" label="Alamat *" value={newCompany.address} onChange={(e) => setNewCompany({ ...newCompany, address: e.target.value })} />
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField fullWidth size="small" label="Kota *" value={newCompany.city} onChange={(e) => setNewCompany({ ...newCompany, city: e.target.value })} />
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField fullWidth size="small" label="Kontak" value={newCompany.contact} onChange={(e) => setNewCompany({ ...newCompany, contact: e.target.value })} />
+                  </Grid>
+                </Grid>
+                <Button variant="contained" sx={{ mt: 2 }} onClick={addCompany}>Simpan & Lanjut</Button>
+              </Box>
             )}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       )}
 
-      {step === 2 && selectedCompany && (
-        <div className="card">
-          <div className="card-header">
-            <h2>Step 2: Detail Pengajuan</h2>
-            <button className="btn btn-sm btn-secondary" onClick={() => setStep(1)}>← Ganti Perusahaan</button>
-          </div>
+      {step === 1 && selectedCompany && (
+        <Card>
+          <CardContent>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+              <Typography variant="h4">Detail Pengajuan</Typography>
+              <Button size="small" startIcon={<IconArrowLeft size={16} />} onClick={() => setStep(0)}>
+                Ganti Perusahaan
+              </Button>
+            </Stack>
 
-          <div className="alert alert-info">
-            <strong>Perusahaan dipilih:</strong> {selectedCompany.name}<br />
-            <small>{selectedCompany.address}{selectedCompany.city ? `, ${selectedCompany.city}` : ''}</small>
-          </div>
+            <Alert severity="info" sx={{ mb: 3 }}>
+              <strong>Perusahaan:</strong> {selectedCompany.name}<br />
+              <Typography variant="caption">{selectedCompany.address}{selectedCompany.city ? `, ${selectedCompany.city}` : ''}</Typography>
+            </Alert>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div className="form-group">
-              <label>Posisi / Jabatan</label>
-              <input value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} placeholder="Contoh: Software Engineer Intern" />
-            </div>
-            <div className="form-group">
-              <label>Divisi</label>
-              <input value={form.division} onChange={(e) => setForm({ ...form, division: e.target.value })} placeholder="Contoh: IT Department" />
-            </div>
-          </div>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth label="Posisi / Jabatan" value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} placeholder="Software Engineer Intern" />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth label="Divisi" value={form.division} onChange={(e) => setForm({ ...form, division: e.target.value })} placeholder="IT Department" />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth label="Tanggal Mulai *" type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth label="Tanggal Selesai *" type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} />
+              </Grid>
+              <Grid size={{ xs: 12 }}>
+                <TextField fullWidth label="Catatan Tambahan" multiline rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Informasi tambahan jika ada" />
+              </Grid>
+            </Grid>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div className="form-group">
-              <label>Tanggal Mulai *</label>
-              <input type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} />
-            </div>
-            <div className="form-group">
-              <label>Tanggal Selesai *</label>
-              <input type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label>Catatan Tambahan</label>
-            <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Informasi tambahan jika ada" />
-          </div>
-
-          <button className="btn btn-success btn-block" onClick={submitApplication} disabled={submitting}>
-            {submitting ? 'Mengirim...' : '📤 Submit Pengajuan'}
-          </button>
-        </div>
+            <Button
+              variant="contained"
+              color="success"
+              fullWidth
+              size="large"
+              sx={{ mt: 3, py: 1.5 }}
+              onClick={submitApplication}
+              disabled={submitting}
+            >
+              {submitting ? 'Mengirim...' : '📤 Submit Pengajuan'}
+            </Button>
+          </CardContent>
+        </Card>
       )}
-    </div>
+    </Box>
   );
 }

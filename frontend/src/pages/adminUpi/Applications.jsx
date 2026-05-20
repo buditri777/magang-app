@@ -1,6 +1,23 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  Box, Typography, Card, CardContent, TextField, Select, MenuItem, FormControl,
+  InputLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Chip, Button, Stack, Dialog, DialogTitle, DialogContent, DialogActions,
+  InputAdornment, Alert,
+} from '@mui/material';
+import { IconSearch } from '@tabler/icons-react';
 import api from '../../lib/api';
+
+const statusMap = {
+  submitted: { label: 'Diajukan', color: 'info' },
+  under_review: { label: 'Ditinjau', color: 'warning' },
+  rejected: { label: 'Ditolak', color: 'error' },
+  approved: { label: 'Disetujui', color: 'success' },
+  letter_generated: { label: 'Surat Dibuat', color: 'success' },
+  signed: { label: 'Ditandatangani', color: 'success' },
+  completed: { label: 'Selesai', color: 'success' },
+};
 
 export default function AdminUpiApplications() {
   const queryClient = useQueryClient();
@@ -8,7 +25,6 @@ export default function AdminUpiApplications() {
   const [reviewModal, setReviewModal] = useState(null);
   const [letterNumber, setLetterNumber] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
-  const [uploadFile, setUploadFile] = useState(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['upi-applications', filters],
@@ -35,149 +51,155 @@ export default function AdminUpiApplications() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['upi-applications']);
-      setUploadFile(null);
       alert('Surat berhasil diupload');
     },
   });
 
   const apps = data?.applications || [];
 
-  const handleApprove = (app) => {
+  const handleApprove = () => {
     if (!letterNumber) return alert('Nomor surat wajib diisi');
-    reviewMutation.mutate({ id: app.id, action: 'approve', letter_number: letterNumber });
+    reviewMutation.mutate({ id: reviewModal.id, action: 'approve', letter_number: letterNumber });
   };
 
-  const handleReject = (app) => {
+  const handleReject = () => {
     if (!rejectionReason) return alert('Alasan penolakan wajib diisi');
-    reviewMutation.mutate({ id: app.id, action: 'reject', rejection_reason: rejectionReason });
-  };
-
-  const statusBadge = (status) => {
-    const map = {
-      submitted: ['badge-info', 'Diajukan'],
-      under_review: ['badge-warning', 'Ditinjau'],
-      rejected: ['badge-danger', 'Ditolak'],
-      approved: ['badge-success', 'Disetujui'],
-      letter_generated: ['badge-success', 'Surat Dibuat'],
-      signed: ['badge-success', 'Ditandatangani'],
-      completed: ['badge-success', 'Selesai'],
-    };
-    const [cls, label] = map[status] || ['badge-default', status];
-    return <span className={`badge ${cls}`}>{label}</span>;
+    reviewMutation.mutate({ id: reviewModal.id, action: 'reject', rejection_reason: rejectionReason });
   };
 
   return (
-    <div>
-      <div className="page-header">
-        <h1>Pengajuan Surat Magang</h1>
-        <p>Validasi, nomor surat, dan upload surat bertandatangan</p>
-      </div>
+    <Box>
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h2">Pengajuan Surat Magang</Typography>
+        <Typography variant="body2" color="text.secondary">Validasi, nomor surat, dan upload surat bertandatangan</Typography>
+      </Box>
 
-      <div className="filters">
-        <input
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 3 }}>
+        <TextField
+          size="small"
           placeholder="Cari mahasiswa/perusahaan..."
           value={filters.search}
           onChange={(e) => setFilters(f => ({ ...f, search: e.target.value }))}
+          slotProps={{ input: { startAdornment: <InputAdornment position="start"><IconSearch size={18} /></InputAdornment> } }}
+          sx={{ minWidth: 250 }}
         />
-        <select value={filters.status} onChange={(e) => setFilters(f => ({ ...f, status: e.target.value }))}>
-          <option value="">Semua Status</option>
-          <option value="submitted">Diajukan</option>
-          <option value="approved">Disetujui</option>
-          <option value="signed">Ditandatangani</option>
-          <option value="rejected">Ditolak</option>
-        </select>
-      </div>
+        <FormControl size="small" sx={{ minWidth: 160 }}>
+          <InputLabel>Status</InputLabel>
+          <Select value={filters.status} label="Status" onChange={(e) => setFilters(f => ({ ...f, status: e.target.value }))}>
+            <MenuItem value="">Semua</MenuItem>
+            <MenuItem value="submitted">Diajukan</MenuItem>
+            <MenuItem value="approved">Disetujui</MenuItem>
+            <MenuItem value="signed">Ditandatangani</MenuItem>
+            <MenuItem value="rejected">Ditolak</MenuItem>
+          </Select>
+        </FormControl>
+      </Stack>
 
-      {isLoading ? <div className="loading">Loading...</div> : (
-        <div className="card">
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Mahasiswa</th>
-                  <th>NIM</th>
-                  <th>Perusahaan</th>
-                  <th>Kota</th>
-                  <th>Periode</th>
-                  <th>Status</th>
-                  <th>Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {apps.map(app => (
-                  <tr key={app.id}>
-                    <td>{app.student_name}</td>
-                    <td>{app.nim}</td>
-                    <td>{app.company_name}</td>
-                    <td>{app.city}</td>
-                    <td style={{ fontSize: '0.8rem' }}>
-                      {new Date(app.start_date).toLocaleDateString('id-ID')} -<br />
-                      {new Date(app.end_date).toLocaleDateString('id-ID')}
-                    </td>
-                    <td>{statusBadge(app.status)}</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                        {app.status === 'submitted' && (
-                          <button className="btn btn-sm btn-primary" onClick={() => setReviewModal(app)}>
-                            Review
-                          </button>
-                        )}
-                        {app.status === 'approved' && (
-                          <label className="btn btn-sm btn-success" style={{ cursor: 'pointer' }}>
-                            ⬆ Upload TTD
-                            <input type="file" hidden onChange={(e) => {
-                              if (e.target.files[0]) uploadMutation.mutate({ id: app.id, file: e.target.files[0] });
-                            }} />
-                          </label>
-                        )}
-                        {app.status === 'signed' && (
-                          <span className="badge badge-success">✓ Selesai</span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {apps.length === 0 && <tr><td colSpan={7} className="empty-state">Tidak ada data</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      <Card>
+        <CardContent sx={{ p: 0 }}>
+          {isLoading ? (
+            <Box sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>Loading...</Box>
+          ) : (
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Mahasiswa</TableCell>
+                    <TableCell>NIM</TableCell>
+                    <TableCell>Perusahaan</TableCell>
+                    <TableCell>Kota</TableCell>
+                    <TableCell>Periode</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Aksi</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {apps.map(app => {
+                    const st = statusMap[app.status] || { label: app.status, color: 'default' };
+                    return (
+                      <TableRow key={app.id} hover>
+                        <TableCell sx={{ fontWeight: 500 }}>{app.student_name}</TableCell>
+                        <TableCell>{app.nim}</TableCell>
+                        <TableCell>{app.company_name}</TableCell>
+                        <TableCell>{app.city}</TableCell>
+                        <TableCell sx={{ fontSize: '0.8rem' }}>
+                          {new Date(app.start_date).toLocaleDateString('id-ID')} -<br />
+                          {new Date(app.end_date).toLocaleDateString('id-ID')}
+                        </TableCell>
+                        <TableCell><Chip label={st.label} size="small" color={st.color} /></TableCell>
+                        <TableCell>
+                          <Stack direction="row" spacing={0.5}>
+                            {app.status === 'submitted' && (
+                              <Button size="small" variant="contained" onClick={() => setReviewModal(app)}>
+                                Review
+                              </Button>
+                            )}
+                            {app.status === 'approved' && (
+                              <Button size="small" variant="contained" color="success" component="label">
+                                Upload TTD
+                                <input type="file" hidden onChange={(e) => {
+                                  if (e.target.files[0]) uploadMutation.mutate({ id: app.id, file: e.target.files[0] });
+                                }} />
+                              </Button>
+                            )}
+                            {app.status === 'signed' && (
+                              <Chip label="✓ Selesai" size="small" color="success" />
+                            )}
+                          </Stack>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {apps.length === 0 && (
+                    <TableRow><TableCell colSpan={7} align="center" sx={{ py: 4, color: 'text.secondary' }}>Tidak ada data</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </CardContent>
+      </Card>
 
-      {/* Review Modal */}
-      {reviewModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-          <div style={{ background: 'white', borderRadius: '16px', padding: '32px', maxWidth: '500px', width: '100%' }}>
-            <h2 style={{ marginBottom: '16px' }}>Review Pengajuan</h2>
-            <div style={{ marginBottom: '16px', padding: '12px', background: '#f8fafc', borderRadius: '8px' }}>
-              <strong>{reviewModal.student_name}</strong> ({reviewModal.nim})<br />
-              <small>{reviewModal.company_name} - {reviewModal.city}</small>
-            </div>
-
-            <div className="form-group">
-              <label>Nomor Surat (untuk approve)</label>
-              <input value={letterNumber} onChange={(e) => setLetterNumber(e.target.value)} placeholder="Contoh: 001/UN40.FT/PL/2026" />
-            </div>
-
-            <div className="form-group">
-              <label>Alasan Penolakan (untuk reject)</label>
-              <textarea value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} placeholder="Alasan jika ditolak..." />
-            </div>
-
-            <div style={{ display: 'flex', gap: '8px', marginTop: '20px' }}>
-              <button className="btn btn-success" onClick={() => handleApprove(reviewModal)} disabled={reviewMutation.isPending}>
-                ✓ Setujui
-              </button>
-              <button className="btn btn-danger" onClick={() => handleReject(reviewModal)} disabled={reviewMutation.isPending}>
-                ✗ Tolak
-              </button>
-              <button className="btn btn-secondary" onClick={() => setReviewModal(null)}>
-                Batal
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      {/* Review Dialog */}
+      <Dialog open={Boolean(reviewModal)} onClose={() => setReviewModal(null)} maxWidth="sm" fullWidth>
+        <DialogTitle>Review Pengajuan</DialogTitle>
+        <DialogContent>
+          {reviewModal && (
+            <>
+              <Alert severity="info" sx={{ mb: 2 }}>
+                <strong>{reviewModal.student_name}</strong> ({reviewModal.nim})<br />
+                {reviewModal.company_name} - {reviewModal.city}
+              </Alert>
+              <TextField
+                label="Nomor Surat (untuk approve)"
+                fullWidth
+                value={letterNumber}
+                onChange={(e) => setLetterNumber(e.target.value)}
+                placeholder="Contoh: 001/UN40.FT/PL/2026"
+                sx={{ mb: 2 }}
+              />
+              <TextField
+                label="Alasan Penolakan (untuk reject)"
+                fullWidth
+                multiline
+                rows={3}
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder="Alasan jika ditolak..."
+              />
+            </>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setReviewModal(null)}>Batal</Button>
+          <Button variant="contained" color="error" onClick={handleReject} disabled={reviewMutation.isPending}>
+            Tolak
+          </Button>
+          <Button variant="contained" color="success" onClick={handleApprove} disabled={reviewMutation.isPending}>
+            Setujui
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 }

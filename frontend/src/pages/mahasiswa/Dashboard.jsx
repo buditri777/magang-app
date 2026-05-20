@@ -1,7 +1,35 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import {
+  Box, Typography, Card, CardContent, Grid, Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow, Chip, Button, Stack,
+} from '@mui/material';
+import { IconClipboardList, IconClock, IconCheck, IconX, IconPlus } from '@tabler/icons-react';
 import api from '../../lib/api';
 import { useAuth } from '../../hooks/useAuth';
+
+const statusMap = {
+  draft: { label: 'Draft', color: 'default' },
+  submitted: { label: 'Diajukan', color: 'info' },
+  under_review: { label: 'Ditinjau', color: 'warning' },
+  rejected: { label: 'Ditolak', color: 'error' },
+  approved: { label: 'Disetujui', color: 'success' },
+  letter_generated: { label: 'Surat Dibuat', color: 'success' },
+  signed: { label: 'Ditandatangani', color: 'success' },
+  completed: { label: 'Selesai', color: 'success' },
+};
+
+const StatCard = ({ icon, label, value, color = 'primary.main' }) => (
+  <Card sx={{ borderLeft: '4px solid', borderColor: color }}>
+    <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+      <Box sx={{ color, display: 'flex' }}>{icon}</Box>
+      <Box>
+        <Typography variant="subtitle2" color="text.secondary">{label}</Typography>
+        <Typography variant="h3">{value}</Typography>
+      </Box>
+    </CardContent>
+  </Card>
+);
 
 export default function MahasiswaDashboard() {
   const { user } = useAuth();
@@ -21,68 +49,71 @@ export default function MahasiswaDashboard() {
   };
 
   return (
-    <div>
-      <div className="page-header">
-        <h1>Halo, {user?.full_name} 👋</h1>
-        <p>Selamat datang di Sistem Manajemen Magang</p>
-      </div>
+    <Box>
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h2">Halo, {user?.full_name} 👋</Typography>
+        <Typography variant="body2" color="text.secondary">Selamat datang di Sistem Manajemen Magang UDB</Typography>
+      </Box>
 
-      <div className="stats-grid">
-        <div className="stat-card"><div className="label">Total Pengajuan</div><div className="value">{stats.total}</div></div>
-        <div className="stat-card"><div className="label">Sedang Diproses</div><div className="value">{stats.submitted}</div></div>
-        <div className="stat-card"><div className="label">Disetujui</div><div className="value">{stats.approved}</div></div>
-        <div className="stat-card"><div className="label">Ditolak</div><div className="value">{stats.rejected}</div></div>
-      </div>
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <StatCard icon={<IconClipboardList size={28} />} label="Total Pengajuan" value={stats.total} />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <StatCard icon={<IconClock size={28} />} label="Sedang Diproses" value={stats.submitted} color="warning.dark" />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <StatCard icon={<IconCheck size={28} />} label="Disetujui" value={stats.approved} color="success.dark" />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <StatCard icon={<IconX size={28} />} label="Ditolak" value={stats.rejected} color="error.main" />
+        </Grid>
+      </Grid>
 
-      <div className="card">
-        <div className="card-header">
-          <h2>Pengajuan Terbaru</h2>
-          <button className="btn btn-primary" onClick={() => navigate('/mahasiswa/apply')}>
-            + Ajukan Magang Baru
-          </button>
-        </div>
-        {apps.length === 0 ? (
-          <div className="empty-state">
-            <p>Belum ada pengajuan magang.</p>
-            <button className="btn btn-primary" style={{ marginTop: '16px' }} onClick={() => navigate('/mahasiswa/apply')}>
-              Ajukan Sekarang
-            </button>
-          </div>
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr><th>Perusahaan</th><th>Posisi</th><th>Periode</th><th>Status</th></tr>
-              </thead>
-              <tbody>
-                {apps.slice(0, 5).map(app => (
-                  <tr key={app.id}>
-                    <td>{app.company_name}</td>
-                    <td>{app.position || '-'}</td>
-                    <td>{new Date(app.start_date).toLocaleDateString('id-ID')} - {new Date(app.end_date).toLocaleDateString('id-ID')}</td>
-                    <td><StatusBadge status={app.status} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
+      <Card>
+        <CardContent>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+            <Typography variant="h4">Pengajuan Terbaru</Typography>
+            <Button variant="contained" startIcon={<IconPlus size={18} />} onClick={() => navigate('/mahasiswa/apply')}>
+              Ajukan Magang Baru
+            </Button>
+          </Stack>
+          {apps.length === 0 ? (
+            <Box sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>
+              <Typography sx={{ mb: 2 }}>Belum ada pengajuan magang.</Typography>
+              <Button variant="contained" onClick={() => navigate('/mahasiswa/apply')}>Ajukan Sekarang</Button>
+            </Box>
+          ) : (
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Perusahaan</TableCell>
+                    <TableCell>Posisi</TableCell>
+                    <TableCell>Periode</TableCell>
+                    <TableCell>Status</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {apps.slice(0, 5).map(app => {
+                    const st = statusMap[app.status] || { label: app.status, color: 'default' };
+                    return (
+                      <TableRow key={app.id} hover>
+                        <TableCell sx={{ fontWeight: 500 }}>{app.company_name}</TableCell>
+                        <TableCell>{app.position || '-'}</TableCell>
+                        <TableCell sx={{ fontSize: '0.85rem' }}>
+                          {new Date(app.start_date).toLocaleDateString('id-ID')} - {new Date(app.end_date).toLocaleDateString('id-ID')}
+                        </TableCell>
+                        <TableCell><Chip label={st.label} size="small" color={st.color} /></TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </CardContent>
+      </Card>
+    </Box>
   );
-}
-
-function StatusBadge({ status }) {
-  const map = {
-    draft: ['badge-default', 'Draft'],
-    submitted: ['badge-info', 'Diajukan'],
-    under_review: ['badge-warning', 'Ditinjau'],
-    rejected: ['badge-danger', 'Ditolak'],
-    approved: ['badge-success', 'Disetujui'],
-    letter_generated: ['badge-success', 'Surat Dibuat'],
-    signed: ['badge-success', 'Ditandatangani'],
-    completed: ['badge-success', 'Selesai'],
-  };
-  const [cls, label] = map[status] || ['badge-default', status];
-  return <span className={`badge ${cls}`}>{label}</span>;
 }

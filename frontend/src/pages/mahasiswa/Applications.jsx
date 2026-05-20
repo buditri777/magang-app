@@ -1,5 +1,20 @@
 import { useQuery } from '@tanstack/react-query';
+import {
+  Box, Typography, Card, CardContent, Chip, Button, Stack, Alert, Grid,
+} from '@mui/material';
+import { IconDownload, IconUsers } from '@tabler/icons-react';
 import api from '../../lib/api';
+
+const statusMap = {
+  draft: { label: 'Draft', color: 'default' },
+  submitted: { label: 'Diajukan', color: 'info' },
+  under_review: { label: 'Ditinjau', color: 'warning' },
+  rejected: { label: 'Ditolak', color: 'error' },
+  approved: { label: 'Disetujui', color: 'success' },
+  letter_generated: { label: 'Surat Dibuat', color: 'success' },
+  signed: { label: 'Ditandatangani', color: 'success' },
+  completed: { label: 'Selesai', color: 'success' },
+};
 
 export default function MahasiswaApplications() {
   const { data, isLoading } = useQuery({
@@ -38,70 +53,75 @@ export default function MahasiswaApplications() {
     }
   };
 
-  if (isLoading) return <div className="loading">Loading...</div>;
+  if (isLoading) return <Box sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>Loading...</Box>;
 
   return (
-    <div>
-      <div className="page-header">
-        <h1>Riwayat Pengajuan</h1>
-        <p>Daftar semua pengajuan surat pengantar magang Anda</p>
-      </div>
+    <Box>
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h2">Riwayat Pengajuan</Typography>
+        <Typography variant="body2" color="text.secondary">Daftar semua pengajuan surat pengantar magang Anda</Typography>
+      </Box>
 
       {apps.length === 0 ? (
-        <div className="card empty-state">Belum ada pengajuan</div>
+        <Card>
+          <CardContent sx={{ py: 6, textAlign: 'center', color: 'text.secondary' }}>
+            Belum ada pengajuan
+          </CardContent>
+        </Card>
       ) : (
-        apps.map(app => (
-          <div className="card" key={app.id}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
-              <div>
-                <h3 style={{ fontSize: '1.1rem', marginBottom: '4px' }}>{app.company_name}</h3>
-                <p style={{ color: '#64748b', fontSize: '0.85rem' }}>
-                  {app.company_city} • {app.position || 'Posisi belum ditentukan'}
-                </p>
-              </div>
-              <StatusBadge status={app.status} />
-            </div>
+        apps.map(app => {
+          const st = statusMap[app.status] || { label: app.status, color: 'default' };
+          return (
+            <Card key={app.id} sx={{ mb: 2 }}>
+              <CardContent>
+                <Stack direction="row" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={1}>
+                  <Box>
+                    <Typography variant="h4">{app.company_name}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {app.company_city} • {app.position || 'Posisi belum ditentukan'}
+                    </Typography>
+                  </Box>
+                  <Chip label={st.label} color={st.color} size="small" />
+                </Stack>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginTop: '16px', padding: '12px', background: '#f8fafc', borderRadius: '8px' }}>
-              <div><small style={{ color: '#64748b' }}>Periode</small><br />{new Date(app.start_date).toLocaleDateString('id-ID')} - {new Date(app.end_date).toLocaleDateString('id-ID')}</div>
-              <div><small style={{ color: '#64748b' }}>Divisi</small><br />{app.division || '-'}</div>
-              <div><small style={{ color: '#64748b' }}>No. Surat</small><br />{app.letter_number || app.final_letter_number || '-'}</div>
-            </div>
+                <Grid container spacing={2} sx={{ mt: 1.5, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <Typography variant="caption" color="text.secondary">Periode</Typography>
+                    <Typography variant="body2">
+                      {new Date(app.start_date).toLocaleDateString('id-ID')} - {new Date(app.end_date).toLocaleDateString('id-ID')}
+                    </Typography>
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <Typography variant="caption" color="text.secondary">Divisi</Typography>
+                    <Typography variant="body2">{app.division || '-'}</Typography>
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <Typography variant="caption" color="text.secondary">No. Surat</Typography>
+                    <Typography variant="body2">{app.letter_number || app.final_letter_number || '-'}</Typography>
+                  </Grid>
+                </Grid>
 
-            {app.rejection_reason && (
-              <div className="alert alert-error" style={{ marginTop: '12px' }}>
-                <strong>Alasan ditolak:</strong> {app.rejection_reason}
-              </div>
-            )}
+                {app.rejection_reason && (
+                  <Alert severity="error" sx={{ mt: 2 }}>
+                    <strong>Alasan ditolak:</strong> {app.rejection_reason}
+                  </Alert>
+                )}
 
-            <div style={{ marginTop: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {app.is_signed && (
-                <button className="btn btn-sm btn-success" onClick={() => downloadSigned(app.id)}>
-                  ⬇ Download Surat
-                </button>
-              )}
-              <button className="btn btn-sm btn-secondary" onClick={() => viewApplicants(app.company_id, app.company_name)}>
-                👥 Lihat Mahasiswa Lain
-              </button>
-            </div>
-          </div>
-        ))
+                <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+                  {app.is_signed && (
+                    <Button size="small" variant="contained" color="success" startIcon={<IconDownload size={16} />} onClick={() => downloadSigned(app.id)}>
+                      Download Surat
+                    </Button>
+                  )}
+                  <Button size="small" variant="outlined" startIcon={<IconUsers size={16} />} onClick={() => viewApplicants(app.company_id, app.company_name)}>
+                    Mahasiswa Lain
+                  </Button>
+                </Stack>
+              </CardContent>
+            </Card>
+          );
+        })
       )}
-    </div>
+    </Box>
   );
-}
-
-function StatusBadge({ status }) {
-  const map = {
-    draft: ['badge-default', 'Draft'],
-    submitted: ['badge-info', 'Diajukan'],
-    under_review: ['badge-warning', 'Ditinjau'],
-    rejected: ['badge-danger', 'Ditolak'],
-    approved: ['badge-success', 'Disetujui'],
-    letter_generated: ['badge-success', 'Surat Dibuat'],
-    signed: ['badge-success', 'Ditandatangani'],
-    completed: ['badge-success', 'Selesai'],
-  };
-  const [cls, label] = map[status] || ['badge-default', status];
-  return <span className={`badge ${cls}`}>{label}</span>;
 }
