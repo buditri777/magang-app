@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
-const db = require('../db/connection');
+const prisma = require('../db/prisma');
 const { verifyToken } = require('../middleware/auth');
 
 const router = express.Router();
@@ -20,16 +20,11 @@ router.post('/login', [
 
     const { email, password } = req.body;
 
-    const [rows] = await db.query(
-      'SELECT * FROM profiles WHERE email = ?',
-      [email]
-    );
+    const user = await prisma.profile.findUnique({ where: { email } });
 
-    if (rows.length === 0) {
+    if (!user) {
       return res.status(401).json({ error: 'Email atau password salah' });
     }
-
-    const user = rows[0];
 
     if (user.status === 'inactive') {
       return res.status(403).json({ error: 'Akun nonaktif, hubungi admin' });
@@ -46,11 +41,14 @@ router.post('/login', [
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
 
-    // Audit log
-    await db.query(
-      'INSERT INTO audit_logs (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)',
-      [user.id, 'login', JSON.stringify({ email }), req.ip]
-    );
+    await prisma.auditLog.create({
+      data: {
+        user_id: user.id,
+        action: 'login',
+        details: { email },
+        ip_address: req.ip,
+      },
+    });
 
     res.json({
       token,
@@ -81,22 +79,24 @@ router.post('/change-password', verifyToken, [
 
     const { current_password, new_password } = req.body;
 
-    const [rows] = await db.query('SELECT password_hash FROM profiles WHERE id = ?', [req.user.id]);
-    const valid = await bcrypt.compare(current_password, rows[0].password_hash);
+    const user = await prisma.profile.findUnique({
+      where: { id: req.user.id },
+      select: { password_hash: true },
+    });
+    const valid = await bcrypt.compare(current_password, user.password_hash);
     if (!valid) {
       return res.status(400).json({ error: 'Password lama salah' });
     }
 
     const hash = await bcrypt.hash(new_password, 10);
-    await db.query(
-      'UPDATE profiles SET password_hash = ?, status = ? WHERE id = ?',
-      [hash, 'active', req.user.id]
-    );
+    await prisma.profile.update({
+      where: { id: req.user.id },
+      data: { password_hash: hash, status: 'active' },
+    });
 
-    await db.query(
-      'INSERT INTO audit_logs (user_id, action, ip_address) VALUES (?, ?, ?)',
-      [req.user.id, 'change_password', req.ip]
-    );
+    await prisma.auditLog.create({
+      data: { user_id: req.user.id, action: 'change_password', ip_address: req.ip },
+    });
 
     res.json({ message: 'Password berhasil diubah' });
   } catch (err) {
@@ -111,27 +111,28 @@ router.post('/forgot-password', [
 ], async (req, res) => {
   try {
     const { email } = req.body;
-    const [rows] = await db.query('SELECT id FROM profiles WHERE email = ?', [email]);
+    const user = await prisma.profile.findUnique({ where: { email }, select: { id: true } });
 
     // Always return success to prevent email enumeration
-    if (rows.length === 0) {
+    if (!user) {
       return res.json({ message: 'Jika email terdaftar, link reset password akan dikirim' });
     }
 
-    // Generate reset token
     const resetToken = jwt.sign(
-      { id: rows[0].id, purpose: 'reset_password' },
+      { id: user.id, purpose: 'reset_password' },
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
 
     // TODO: Send email with reset link
-    // const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
-
-    await db.query(
-      'INSERT INTO user_provisioning_logs (profile_id, email, action, details) VALUES (?, ?, ?, ?)',
-      [rows[0].id, email, 'password_reset', JSON.stringify({ token_generated: true })]
-    );
+    await prisma.userProvisioningLog.create({
+      data: {
+        profile_id: user.id,
+        email,
+        action: 'password_reset',
+        details: JSON.stringify({ token_generated: true }),
+      },
+    });
 
     res.json({ message: 'Jika email terdaftar, link reset password akan dikirim' });
   } catch (err) {
@@ -159,10 +160,10 @@ router.post('/reset-password', [
     }
 
     const hash = await bcrypt.hash(new_password, 10);
-    await db.query(
-      'UPDATE profiles SET password_hash = ?, status = ? WHERE id = ?',
-      [hash, 'active', decoded.id]
-    );
+    await prisma.profile.update({
+      where: { id: decoded.id },
+      data: { password_hash: hash, status: 'active' },
+    });
 
     res.json({ message: 'Password berhasil direset' });
   } catch (err) {
@@ -177,18 +178,25 @@ router.post('/reset-password', [
 // GET /api/auth/me
 router.get('/me', verifyToken, async (req, res) => {
   try {
-    const [rows] = await db.query(
-      `SELECT p.id, p.email, p.full_name, p.role, p.status, p.phone,
-              s.nim, s.program_studi as student_prodi, s.fakultas as student_fakultas, s.angkatan,
-              l.nidn, l.program_studi as lecturer_prodi, l.fakultas as lecturer_fakultas
-       FROM profiles p
-       LEFT JOIN students s ON s.profile_id = p.id
-       LEFT JOIN lecturers l ON l.profile_id = p.id
-       WHERE p.id = ?`,
-      [req.user.id]
-    );
+    const user = await prisma.profile.findUnique({
+      where: { id: req.user.id },
+      select: {
+        id: true,
+        email: true,
+        full_name: true,
+        role: true,
+        status: true,
+        phone: true,
+        student: {
+          select: { nim: true, program_studi: true, fakultas: true, angkatan: true },
+        },
+        lecturer: {
+          select: { nidn: true, program_studi: true, fakultas: true },
+        },
+      },
+    });
 
-    res.json({ user: rows[0] });
+    res.json({ user });
   } catch (err) {
     console.error('Get me error:', err);
     res.status(500).json({ error: 'Server error' });

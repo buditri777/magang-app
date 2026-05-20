@@ -2,10 +2,9 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const multer = require('multer');
 const xlsx = require('xlsx');
-const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const db = require('../db/connection');
+const prisma = require('../db/prisma');
 const { verifyToken, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
@@ -15,51 +14,59 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 },
 });
 
-// All routes here require super_admin
+// All routes require super_admin
 router.use(verifyToken, requireRole('super_admin'));
 
-// GET /api/admin/users - list users with filter
+// GET /api/admin/users
 router.get('/users', async (req, res) => {
   try {
     const { role, status, search } = req.query;
-    let query = 'SELECT id, email, full_name, role, status, phone, created_at FROM profiles WHERE 1=1';
-    const params = [];
+    const where = {};
 
-    if (role) { query += ' AND role = ?'; params.push(role); }
-    if (status) { query += ' AND status = ?'; params.push(status); }
+    if (role) where.role = role;
+    if (status) where.status = status;
     if (search) {
-      query += ' AND (email LIKE ? OR full_name LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`);
+      where.OR = [
+        { email: { contains: search } },
+        { full_name: { contains: search } },
+      ];
     }
-    query += ' ORDER BY created_at DESC';
 
-    const [rows] = await db.query(query, params);
-    res.json({ users: rows });
+    const users = await prisma.profile.findMany({
+      where,
+      select: {
+        id: true, email: true, full_name: true, role: true, status: true, phone: true, created_at: true,
+      },
+      orderBy: { created_at: 'desc' },
+    });
+    res.json({ users });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// PATCH /api/admin/users/:id - update user (status, role)
+// PATCH /api/admin/users/:id
 router.patch('/users/:id', async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = parseInt(req.params.id);
     const { status, role } = req.body;
-    const updates = [];
-    const params = [];
+    const data = {};
+    if (status) data.status = status;
+    if (role) data.role = role;
+    if (Object.keys(data).length === 0) return res.status(400).json({ error: 'No updates' });
 
-    if (status) { updates.push('status = ?'); params.push(status); }
-    if (role) { updates.push('role = ?'); params.push(role); }
-    if (updates.length === 0) return res.status(400).json({ error: 'No updates' });
+    await prisma.profile.update({ where: { id }, data });
 
-    params.push(id);
-    await db.query(`UPDATE profiles SET ${updates.join(', ')} WHERE id = ?`, params);
-
-    await db.query(
-      'INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details) VALUES (?, ?, ?, ?, ?)',
-      [req.user.id, 'update_user', 'profile', id, JSON.stringify({ status, role })]
-    );
+    await prisma.auditLog.create({
+      data: {
+        user_id: req.user.id,
+        action: 'update_user',
+        entity_type: 'profile',
+        entity_id: id,
+        details: { status, role },
+      },
+    });
 
     res.json({ message: 'User berhasil diupdate' });
   } catch (err) {
@@ -71,22 +78,25 @@ router.patch('/users/:id', async (req, res) => {
 // POST /api/admin/users/:id/reset-password
 router.post('/users/:id/reset-password', async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = parseInt(req.params.id);
     const tempPassword = crypto.randomBytes(6).toString('hex');
     const hash = await bcrypt.hash(tempPassword, 10);
 
-    await db.query(
-      'UPDATE profiles SET password_hash = ?, status = ? WHERE id = ?',
-      [hash, 'must_change_password', id]
-    );
+    const user = await prisma.profile.update({
+      where: { id },
+      data: { password_hash: hash, status: 'must_change_password' },
+      select: { email: true },
+    });
 
-    const [rows] = await db.query('SELECT email FROM profiles WHERE id = ?', [id]);
-    await db.query(
-      'INSERT INTO user_provisioning_logs (profile_id, email, action, details) VALUES (?, ?, ?, ?)',
-      [id, rows[0].email, 'password_reset', JSON.stringify({ by_admin: req.user.id })]
-    );
+    await prisma.userProvisioningLog.create({
+      data: {
+        profile_id: id,
+        email: user.email,
+        action: 'password_reset',
+        details: JSON.stringify({ by_admin: req.user.id }),
+      },
+    });
 
-    // TODO: send email with temp password
     res.json({ message: 'Password direset', temp_password: tempPassword });
   } catch (err) {
     console.error(err);
@@ -94,12 +104,12 @@ router.post('/users/:id/reset-password', async (req, res) => {
   }
 });
 
-// GET /api/admin/templates/students - download Excel template
+// GET /api/admin/templates/students
 router.get('/templates/students', (req, res) => {
   const wb = xlsx.utils.book_new();
   const data = [
     ['NIM', 'Nama Lengkap', 'Email', 'Program Studi', 'Fakultas', 'Angkatan', 'Nomor HP', 'NIDN Pembimbing'],
-    ['12345678', 'Contoh Mahasiswa', 'mhs@upi.edu', 'Teknik Informatika', 'FPMIPA', 2023, '08123456789', '1234567890'],
+    ['12345678', 'Contoh Mahasiswa', 'mhs@udb.ac.id', 'Teknik Informatika', 'FTI', 2023, '08123456789', '1234567890'],
   ];
   const ws = xlsx.utils.aoa_to_sheet(data);
   xlsx.utils.book_append_sheet(wb, ws, 'Mahasiswa');
@@ -114,7 +124,7 @@ router.get('/templates/lecturers', (req, res) => {
   const wb = xlsx.utils.book_new();
   const data = [
     ['NIDN', 'Nama Lengkap', 'Email', 'Program Studi', 'Fakultas', 'Nomor HP'],
-    ['1234567890', 'Contoh Dosen', 'dosen@upi.edu', 'Teknik Informatika', 'FPMIPA', '08123456789'],
+    ['1234567890', 'Contoh Dosen', 'dosen@udb.ac.id', 'Teknik Informatika', 'FTI', '08123456789'],
   ];
   const ws = xlsx.utils.aoa_to_sheet(data);
   xlsx.utils.book_append_sheet(wb, ws, 'Dosen');
@@ -124,26 +134,27 @@ router.get('/templates/lecturers', (req, res) => {
   res.send(buf);
 });
 
-// POST /api/admin/import/students - import students from Excel
+// POST /api/admin/import/students
 router.post('/import/students', upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'File tidak ditemukan' });
 
-  const conn = await db.getConnection();
   try {
     const wb = xlsx.readFile(req.file.path);
     const sheet = wb.Sheets[wb.SheetNames[0]];
     const rows = xlsx.utils.sheet_to_json(sheet);
 
-    const [jobResult] = await conn.query(
-      'INSERT INTO import_jobs (type, file_name, total_rows, imported_by, status) VALUES (?, ?, ?, ?, ?)',
-      ['mahasiswa', req.file.originalname, rows.length, req.user.id, 'processing']
-    );
-    const jobId = jobResult.insertId;
+    const job = await prisma.importJob.create({
+      data: {
+        type: 'mahasiswa',
+        file_name: req.file.originalname,
+        total_rows: rows.length,
+        imported_by: req.user.id,
+        status: 'processing',
+      },
+    });
 
     let success = 0, failed = 0;
     const errors = [];
-
-    await conn.beginTransaction();
 
     for (const row of rows) {
       try {
@@ -156,36 +167,40 @@ router.post('/import/students', upload.single('file'), async (req, res) => {
         const phone = String(row['Nomor HP'] || '').trim();
         const nidnPembimbing = String(row['NIDN Pembimbing'] || '').trim();
 
-        if (!nim || !email || !fullName) {
-          throw new Error('NIM, Email, dan Nama wajib diisi');
-        }
+        if (!nim || !email || !fullName) throw new Error('NIM, Email, dan Nama wajib diisi');
 
         const tempPassword = crypto.randomBytes(6).toString('hex');
         const hash = await bcrypt.hash(tempPassword, 10);
 
-        const [profResult] = await conn.query(
-          'INSERT INTO profiles (email, password_hash, full_name, role, status, phone) VALUES (?, ?, ?, ?, ?, ?)',
-          [email, hash, fullName, 'mahasiswa', 'must_change_password', phone]
-        );
-
         let lecturerId = null;
         if (nidnPembimbing) {
-          const [lecRows] = await conn.query(
-            'SELECT profile_id FROM lecturers WHERE nidn = ?',
-            [nidnPembimbing]
-          );
-          if (lecRows.length > 0) lecturerId = lecRows[0].profile_id;
+          const lec = await prisma.lecturer.findUnique({ where: { nidn: nidnPembimbing } });
+          if (lec) lecturerId = lec.profile_id;
         }
 
-        await conn.query(
-          'INSERT INTO students (profile_id, nim, program_studi, fakultas, angkatan, lecturer_id) VALUES (?, ?, ?, ?, ?, ?)',
-          [profResult.insertId, nim, prodi, fakultas, angkatan, lecturerId]
-        );
+        await prisma.$transaction(async (tx) => {
+          const profile = await tx.profile.create({
+            data: {
+              email, password_hash: hash, full_name: fullName,
+              role: 'mahasiswa', status: 'must_change_password', phone,
+            },
+          });
 
-        await conn.query(
-          'INSERT INTO user_provisioning_logs (profile_id, email, action, details) VALUES (?, ?, ?, ?)',
-          [profResult.insertId, email, 'created', JSON.stringify({ temp_password: tempPassword, job_id: jobId })]
-        );
+          await tx.student.create({
+            data: {
+              profile_id: profile.id,
+              nim, program_studi: prodi, fakultas, angkatan,
+              lecturer_id: lecturerId,
+            },
+          });
+
+          await tx.userProvisioningLog.create({
+            data: {
+              profile_id: profile.id, email, action: 'created',
+              details: JSON.stringify({ temp_password: tempPassword, job_id: job.id }),
+            },
+          });
+        });
 
         success++;
       } catch (e) {
@@ -194,20 +209,16 @@ router.post('/import/students', upload.single('file'), async (req, res) => {
       }
     }
 
-    await conn.commit();
-    await conn.query(
-      'UPDATE import_jobs SET success_rows = ?, failed_rows = ?, status = ?, error_details = ? WHERE id = ?',
-      [success, failed, 'completed', JSON.stringify(errors), jobId]
-    );
+    await prisma.importJob.update({
+      where: { id: job.id },
+      data: { success_rows: success, failed_rows: failed, status: 'completed', error_details: errors },
+    });
 
     fs.unlinkSync(req.file.path);
-    res.json({ job_id: jobId, success, failed, errors });
+    res.json({ job_id: job.id, success, failed, errors });
   } catch (err) {
-    await conn.rollback();
     console.error(err);
     res.status(500).json({ error: 'Import gagal', details: err.message });
-  } finally {
-    conn.release();
   }
 });
 
@@ -215,22 +226,23 @@ router.post('/import/students', upload.single('file'), async (req, res) => {
 router.post('/import/lecturers', upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'File tidak ditemukan' });
 
-  const conn = await db.getConnection();
   try {
     const wb = xlsx.readFile(req.file.path);
     const sheet = wb.Sheets[wb.SheetNames[0]];
     const rows = xlsx.utils.sheet_to_json(sheet);
 
-    const [jobResult] = await conn.query(
-      'INSERT INTO import_jobs (type, file_name, total_rows, imported_by, status) VALUES (?, ?, ?, ?, ?)',
-      ['dosen', req.file.originalname, rows.length, req.user.id, 'processing']
-    );
-    const jobId = jobResult.insertId;
+    const job = await prisma.importJob.create({
+      data: {
+        type: 'dosen',
+        file_name: req.file.originalname,
+        total_rows: rows.length,
+        imported_by: req.user.id,
+        status: 'processing',
+      },
+    });
 
     let success = 0, failed = 0;
     const errors = [];
-
-    await conn.beginTransaction();
 
     for (const row of rows) {
       try {
@@ -246,20 +258,25 @@ router.post('/import/lecturers', upload.single('file'), async (req, res) => {
         const tempPassword = crypto.randomBytes(6).toString('hex');
         const hash = await bcrypt.hash(tempPassword, 10);
 
-        const [profResult] = await conn.query(
-          'INSERT INTO profiles (email, password_hash, full_name, role, status, phone) VALUES (?, ?, ?, ?, ?, ?)',
-          [email, hash, fullName, 'dosen', 'must_change_password', phone]
-        );
+        await prisma.$transaction(async (tx) => {
+          const profile = await tx.profile.create({
+            data: {
+              email, password_hash: hash, full_name: fullName,
+              role: 'dosen', status: 'must_change_password', phone,
+            },
+          });
 
-        await conn.query(
-          'INSERT INTO lecturers (profile_id, nidn, program_studi, fakultas) VALUES (?, ?, ?, ?)',
-          [profResult.insertId, nidn, prodi, fakultas]
-        );
+          await tx.lecturer.create({
+            data: { profile_id: profile.id, nidn, program_studi: prodi, fakultas },
+          });
 
-        await conn.query(
-          'INSERT INTO user_provisioning_logs (profile_id, email, action, details) VALUES (?, ?, ?, ?)',
-          [profResult.insertId, email, 'created', JSON.stringify({ temp_password: tempPassword, job_id: jobId })]
-        );
+          await tx.userProvisioningLog.create({
+            data: {
+              profile_id: profile.id, email, action: 'created',
+              details: JSON.stringify({ temp_password: tempPassword, job_id: job.id }),
+            },
+          });
+        });
 
         success++;
       } catch (e) {
@@ -268,33 +285,30 @@ router.post('/import/lecturers', upload.single('file'), async (req, res) => {
       }
     }
 
-    await conn.commit();
-    await conn.query(
-      'UPDATE import_jobs SET success_rows = ?, failed_rows = ?, status = ?, error_details = ? WHERE id = ?',
-      [success, failed, 'completed', JSON.stringify(errors), jobId]
-    );
+    await prisma.importJob.update({
+      where: { id: job.id },
+      data: { success_rows: success, failed_rows: failed, status: 'completed', error_details: errors },
+    });
 
     fs.unlinkSync(req.file.path);
-    res.json({ job_id: jobId, success, failed, errors });
+    res.json({ job_id: job.id, success, failed, errors });
   } catch (err) {
-    await conn.rollback();
     console.error(err);
     res.status(500).json({ error: 'Import gagal', details: err.message });
-  } finally {
-    conn.release();
   }
 });
 
 // GET /api/admin/import-jobs
 router.get('/import-jobs', async (req, res) => {
   try {
-    const [rows] = await db.query(
-      `SELECT j.*, p.full_name as imported_by_name
-       FROM import_jobs j
-       LEFT JOIN profiles p ON p.id = j.imported_by
-       ORDER BY j.created_at DESC LIMIT 50`
-    );
-    res.json({ jobs: rows });
+    const jobs = await prisma.importJob.findMany({
+      include: { importer: { select: { full_name: true } } },
+      orderBy: { created_at: 'desc' },
+      take: 50,
+    });
+
+    const result = jobs.map(j => ({ ...j, imported_by_name: j.importer?.full_name }));
+    res.json({ jobs: result });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

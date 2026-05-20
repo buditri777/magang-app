@@ -1,0 +1,236 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+enum Role {
+  super_admin
+  admin_upi
+  dosen
+  mahasiswa
+}
+
+enum UserStatus {
+  active
+  inactive
+  pending_activation
+  must_change_password
+}
+
+enum ApplicationStatus {
+  draft
+  submitted
+  under_review
+  rejected
+  approved
+  letter_generated
+  signed
+  completed
+}
+
+enum TemplateType {
+  A
+  B
+}
+
+enum ImportType {
+  mahasiswa
+  dosen
+}
+
+enum ImportStatus {
+  processing
+  completed
+  failed
+}
+
+enum ProvisioningAction {
+  created
+  email_sent
+  activated
+  password_reset
+}
+
+model Profile {
+  id            Int        @id @default(autoincrement())
+  email         String     @unique @db.VarChar(255)
+  password_hash String     @db.VarChar(255)
+  full_name     String     @db.VarChar(255)
+  role          Role
+  status        UserStatus @default(pending_activation)
+  phone         String?    @db.VarChar(20)
+  created_at    DateTime   @default(now())
+  updated_at    DateTime   @updatedAt
+
+  student              Student?
+  lecturer             Lecturer?
+  studentsAsLecturer   Student[]              @relation("StudentLecturer")
+  companiesCreated     Company[]
+  applicationsReviewed InternshipApplication[] @relation("ApplicationReviewer")
+  templatesUploaded    LetterTemplate[]
+  importJobs           ImportJob[]
+  provisioningLogs     UserProvisioningLog[]
+  auditLogs            AuditLog[]
+
+  @@map("profiles")
+}
+
+model Student {
+  id             Int      @id @default(autoincrement())
+  profile_id     Int      @unique
+  nim            String   @unique @db.VarChar(20)
+  program_studi  String?  @db.VarChar(100)
+  fakultas       String?  @db.VarChar(100)
+  angkatan       Int?     @db.Year
+  lecturer_id    Int?
+  created_at     DateTime @default(now())
+
+  profile      Profile                 @relation(fields: [profile_id], references: [id], onDelete: Cascade)
+  lecturer     Profile?                @relation("StudentLecturer", fields: [lecturer_id], references: [id], onDelete: SetNull)
+  applications InternshipApplication[]
+
+  @@map("students")
+}
+
+model Lecturer {
+  id            Int      @id @default(autoincrement())
+  profile_id    Int      @unique
+  nidn          String   @unique @db.VarChar(20)
+  program_studi String?  @db.VarChar(100)
+  fakultas      String?  @db.VarChar(100)
+  created_at    DateTime @default(now())
+
+  profile Profile @relation(fields: [profile_id], references: [id], onDelete: Cascade)
+
+  @@map("lecturers")
+}
+
+model Company {
+  id              Int      @id @default(autoincrement())
+  name            String   @db.VarChar(255)
+  name_normalized String   @db.VarChar(255)
+  address         String?  @db.Text
+  city            String?  @db.VarChar(100)
+  contact         String?  @db.VarChar(100)
+  created_by      Int?
+  created_at      DateTime @default(now())
+
+  creator      Profile?                @relation(fields: [created_by], references: [id], onDelete: SetNull)
+  applications InternshipApplication[]
+
+  @@index([name_normalized], map: "idx_companies_name_norm")
+  @@map("companies")
+}
+
+model InternshipApplication {
+  id               Int               @id @default(autoincrement())
+  student_id       Int
+  company_id       Int
+  position         String?           @db.VarChar(255)
+  division         String?           @db.VarChar(255)
+  start_date       DateTime          @db.Date
+  end_date         DateTime          @db.Date
+  notes            String?           @db.Text
+  status           ApplicationStatus @default(draft)
+  rejection_reason String?           @db.Text
+  letter_number    String?           @db.VarChar(100)
+  template_type    TemplateType?
+  batch_key        String?           @db.VarChar(255)
+  submitted_at     DateTime?
+  reviewed_at      DateTime?
+  reviewed_by      Int?
+  created_at       DateTime          @default(now())
+  updated_at       DateTime          @updatedAt
+
+  student          Student          @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  company          Company          @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  reviewer         Profile?         @relation("ApplicationReviewer", fields: [reviewed_by], references: [id], onDelete: SetNull)
+  generatedLetter  GeneratedLetter?
+
+  @@index([status], map: "idx_applications_status")
+  @@index([company_id], map: "idx_applications_company")
+  @@index([batch_key], map: "idx_applications_batch")
+  @@map("internship_applications")
+}
+
+model LetterTemplate {
+  id          Int          @id @default(autoincrement())
+  name        String       @db.VarChar(255)
+  type        TemplateType
+  file_path   String       @db.VarChar(500)
+  uploaded_by Int?
+  is_active   Boolean      @default(true)
+  created_at  DateTime     @default(now())
+
+  uploader         Profile?          @relation(fields: [uploaded_by], references: [id], onDelete: SetNull)
+  generatedLetters GeneratedLetter[]
+
+  @@map("letter_templates")
+}
+
+model GeneratedLetter {
+  id                   Int       @id @default(autoincrement())
+  application_id       Int       @unique
+  letter_number        String?   @db.VarChar(100)
+  template_id          Int?
+  generated_file_path  String?   @db.VarChar(500)
+  signed_file_path     String?   @db.VarChar(500)
+  is_signed            Boolean   @default(false)
+  signed_at            DateTime?
+  generated_at         DateTime  @default(now())
+
+  application InternshipApplication @relation(fields: [application_id], references: [id], onDelete: Cascade)
+  template    LetterTemplate?       @relation(fields: [template_id], references: [id], onDelete: SetNull)
+
+  @@map("generated_letters")
+}
+
+model ImportJob {
+  id            Int          @id @default(autoincrement())
+  type          ImportType
+  file_name     String       @db.VarChar(255)
+  total_rows    Int          @default(0)
+  success_rows  Int          @default(0)
+  failed_rows   Int          @default(0)
+  status        ImportStatus @default(processing)
+  error_details Json?
+  imported_by   Int?
+  created_at    DateTime     @default(now())
+
+  importer Profile? @relation(fields: [imported_by], references: [id], onDelete: SetNull)
+
+  @@map("import_jobs")
+}
+
+model UserProvisioningLog {
+  id         Int                @id @default(autoincrement())
+  profile_id Int?
+  email      String             @db.VarChar(255)
+  action     ProvisioningAction
+  details    String?            @db.Text
+  created_at DateTime           @default(now())
+
+  profile Profile? @relation(fields: [profile_id], references: [id], onDelete: SetNull)
+
+  @@map("user_provisioning_logs")
+}
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  user_id     Int?
+  action      String   @db.VarChar(100)
+  entity_type String?  @db.VarChar(50)
+  entity_id   Int?
+  details     Json?
+  ip_address  String?  @db.VarChar(45)
+  created_at  DateTime @default(now())
+
+  user Profile? @relation(fields: [user_id], references: [id], onDelete: SetNull)
+
+  @@index([user_id], map: "idx_audit_user")
+  @@index([action], map: "idx_audit_action")
+  @@map("audit_logs")
+}

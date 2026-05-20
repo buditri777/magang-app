@@ -1,5 +1,5 @@
 const express = require('express');
-const db = require('../db/connection');
+const prisma = require('../db/prisma');
 const { verifyToken, requireRole, requireActiveAccount } = require('../middleware/auth');
 
 const router = express.Router();
@@ -9,16 +9,28 @@ router.use(verifyToken, requireActiveAccount, requireRole('dosen'));
 // GET /api/dosen/students - daftar mahasiswa bimbingan
 router.get('/students', async (req, res) => {
   try {
-    const [rows] = await db.query(
-      `SELECT s.id, s.nim, s.program_studi, s.fakultas, s.angkatan,
-              p.full_name, p.email, p.phone
-       FROM students s
-       JOIN profiles p ON p.id = s.profile_id
-       WHERE s.lecturer_id = ?
-       ORDER BY p.full_name ASC`,
-      [req.user.id]
-    );
-    res.json({ students: rows });
+    const students = await prisma.student.findMany({
+      where: { lecturer_id: req.user.id },
+      include: {
+        profile: {
+          select: { full_name: true, email: true, phone: true },
+        },
+      },
+      orderBy: { profile: { full_name: 'asc' } },
+    });
+
+    const result = students.map(s => ({
+      id: s.id,
+      nim: s.nim,
+      program_studi: s.program_studi,
+      fakultas: s.fakultas,
+      angkatan: s.angkatan,
+      full_name: s.profile.full_name,
+      email: s.profile.email,
+      phone: s.profile.phone,
+    }));
+
+    res.json({ students: result });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -28,18 +40,31 @@ router.get('/students', async (req, res) => {
 // GET /api/dosen/applications - pengajuan mahasiswa bimbingan
 router.get('/applications', async (req, res) => {
   try {
-    const [rows] = await db.query(
-      `SELECT ia.*, c.name as company_name, c.city,
-              p.full_name as student_name, s.nim, s.program_studi
-       FROM internship_applications ia
-       JOIN students s ON s.id = ia.student_id
-       JOIN profiles p ON p.id = s.profile_id
-       JOIN companies c ON c.id = ia.company_id
-       WHERE s.lecturer_id = ?
-       ORDER BY ia.created_at DESC`,
-      [req.user.id]
-    );
-    res.json({ applications: rows });
+    const apps = await prisma.internshipApplication.findMany({
+      where: { student: { lecturer_id: req.user.id } },
+      include: {
+        company: { select: { name: true, city: true } },
+        student: {
+          select: {
+            nim: true,
+            program_studi: true,
+            profile: { select: { full_name: true } },
+          },
+        },
+      },
+      orderBy: { created_at: 'desc' },
+    });
+
+    const result = apps.map(a => ({
+      ...a,
+      company_name: a.company.name,
+      city: a.company.city,
+      student_name: a.student.profile.full_name,
+      nim: a.student.nim,
+      program_studi: a.student.program_studi,
+    }));
+
+    res.json({ applications: result });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

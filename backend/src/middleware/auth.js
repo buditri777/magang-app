@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const db = require('../db/connection');
+const prisma = require('../db/prisma');
 
 const verifyToken = async (req, res, next) => {
   try {
@@ -11,20 +11,20 @@ const verifyToken = async (req, res, next) => {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    const [rows] = await db.query(
-      'SELECT id, email, full_name, role, status FROM profiles WHERE id = ?',
-      [decoded.id]
-    );
+    const user = await prisma.profile.findUnique({
+      where: { id: decoded.id },
+      select: { id: true, email: true, full_name: true, role: true, status: true },
+    });
 
-    if (rows.length === 0) {
+    if (!user) {
       return res.status(401).json({ error: 'User tidak ditemukan' });
     }
 
-    if (rows[0].status === 'inactive') {
+    if (user.status === 'inactive') {
       return res.status(403).json({ error: 'Akun nonaktif' });
     }
 
-    req.user = rows[0];
+    req.user = user;
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Token tidak valid' });
