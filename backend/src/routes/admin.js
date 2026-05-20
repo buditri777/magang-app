@@ -46,6 +46,79 @@ router.get('/users', async (req, res) => {
   }
 });
 
+// POST /api/admin/users — create user manual
+router.post('/users', async (req, res) => {
+  try {
+    const { email, full_name, role, phone, nim, nidn, program_studi, fakultas, angkatan } = req.body;
+    if (!email || !full_name || !role) {
+      return res.status(400).json({ error: 'email, full_name, dan role wajib diisi' });
+    }
+
+    const existing = await prisma.profile.findUnique({ where: { email } });
+    if (existing) return res.status(409).json({ error: 'Email sudah terdaftar' });
+
+    const tempPassword = crypto.randomBytes(6).toString('hex');
+    const hash = await bcrypt.hash(tempPassword, 10);
+
+    const profile = await prisma.profile.create({
+      data: {
+        email,
+        full_name,
+        role,
+        phone: phone || null,
+        password_hash: hash,
+        status: 'must_change_password',
+      },
+    });
+
+    // Create role-specific record
+    if (role === 'mahasiswa' && nim) {
+      await prisma.student.create({
+        data: {
+          profile_id: profile.id,
+          nim,
+          program_studi: program_studi || null,
+          fakultas: fakultas || null,
+          angkatan: angkatan ? parseInt(angkatan) : null,
+        },
+      });
+    } else if (role === 'dosen' && nidn) {
+      await prisma.lecturer.create({
+        data: {
+          profile_id: profile.id,
+          nidn,
+          program_studi: program_studi || null,
+          fakultas: fakultas || null,
+        },
+      });
+    }
+
+    await prisma.userProvisioningLog.create({
+      data: {
+        profile_id: profile.id,
+        email,
+        action: 'created',
+        details: JSON.stringify({ by_admin: req.user.id, role }),
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        user_id: req.user.id,
+        action: 'create_user',
+        entity_type: 'profile',
+        entity_id: profile.id,
+        details: { email, role },
+      },
+    });
+
+    res.status(201).json({ user: { id: profile.id, email, full_name, role }, temp_password: tempPassword });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // PATCH /api/admin/users/:id
 router.patch('/users/:id', async (req, res) => {
   try {
