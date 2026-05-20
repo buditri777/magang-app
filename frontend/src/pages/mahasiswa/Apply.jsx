@@ -6,10 +6,12 @@ import {
   Divider, Grid, Stepper, Step, StepLabel,
 } from '@mui/material';
 import { IconSearch, IconPlus, IconArrowLeft } from '@tabler/icons-react';
+import { useSnackbar } from 'notistack';
 import api from '../../lib/api';
 
 export default function MahasiswaApply() {
   const navigate = useNavigate();
+  const { enqueueSnackbar } = useSnackbar();
   const [step, setStep] = useState(0);
   const [search, setSearch] = useState('');
   const [companies, setCompanies] = useState([]);
@@ -56,7 +58,7 @@ export default function MahasiswaApply() {
     setError('');
     try {
       await api.post('/applications', { company_id: selectedCompany.id, ...form });
-      alert('Pengajuan berhasil dikirim!');
+      enqueueSnackbar('Pengajuan berhasil dikirim!', { variant: 'success' });
       navigate('/mahasiswa/applications');
     } catch (err) {
       setError(err.response?.data?.error || 'Gagal mengirim pengajuan');

@@ -2,7 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Box, Typography, Card, CardContent, Chip, Button, Stack, Alert, Grid,
 } from '@mui/material';
-import { IconDownload, IconUsers } from '@tabler/icons-react';
+import { IconDownload, IconFileDownload, IconUsers } from '@tabler/icons-react';
+import { useSnackbar } from 'notistack';
 import api from '../../lib/api';
 
 const statusMap = {
@@ -17,12 +18,17 @@ const statusMap = {
 };
 
 export default function MahasiswaApplications() {
+  const { enqueueSnackbar } = useSnackbar();
   const { data, isLoading } = useQuery({
     queryKey: ['my-applications'],
     queryFn: () => api.get('/applications/my').then(r => r.data),
   });
 
   const apps = data?.applications || [];
+
+  const downloadLetter = (appId) => {
+    window.open(`/api/applications/${appId}/generate-letter`, '_blank');
+  };
 
   const downloadSigned = async (appId) => {
     try {
@@ -34,7 +40,7 @@ export default function MahasiswaApplications() {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      alert('Surat belum tersedia');
+      enqueueSnackbar('Surat bertandatangan belum tersedia', { variant: 'warning' });
     }
   };
 
@@ -43,13 +49,13 @@ export default function MahasiswaApplications() {
       const res = await api.get(`/companies/${companyId}/applicants`);
       const list = res.data.applicants;
       if (list.length === 0) {
-        alert(`Belum ada mahasiswa lain yang mendaftar di ${companyName}`);
+        enqueueSnackbar(`Belum ada mahasiswa lain di ${companyName}`, { variant: 'info' });
       } else {
-        const names = list.map(a => `• ${a.full_name} (${a.nim}) - ${a.program_studi}`).join('\n');
-        alert(`Mahasiswa di ${companyName}:\n\n${names}`);
+        const names = list.map(a => `${a.full_name} (${a.nim})`).join(', ');
+        enqueueSnackbar(`Mahasiswa di ${companyName}: ${names}`, { variant: 'info', autoHideDuration: 8000 });
       }
     } catch {
-      alert('Gagal memuat data');
+      enqueueSnackbar('Gagal memuat data', { variant: 'error' });
     }
   };
 
@@ -64,13 +70,15 @@ export default function MahasiswaApplications() {
 
       {apps.length === 0 ? (
         <Card>
-          <CardContent sx={{ py: 6, textAlign: 'center', color: 'text.secondary' }}>
-            Belum ada pengajuan
+          <CardContent sx={{ py: 6, textAlign: 'center' }}>
+            <Typography variant="h4" color="text.secondary" sx={{ mb: 1 }}>Belum ada pengajuan</Typography>
+            <Typography variant="body2" color="text.secondary">Silakan ajukan magang melalui menu "Ajukan Magang"</Typography>
           </CardContent>
         </Card>
       ) : (
         apps.map(app => {
           const st = statusMap[app.status] || { label: app.status, color: 'default' };
+          const canDownloadLetter = ['approved', 'letter_generated', 'signed', 'completed'].includes(app.status);
           return (
             <Card key={app.id} sx={{ mb: 2 }}>
               <CardContent>
@@ -108,9 +116,14 @@ export default function MahasiswaApplications() {
                 )}
 
                 <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+                  {canDownloadLetter && (
+                    <Button size="small" variant="contained" startIcon={<IconFileDownload size={16} />} onClick={() => downloadLetter(app.id)}>
+                      Download Surat
+                    </Button>
+                  )}
                   {app.is_signed && (
                     <Button size="small" variant="contained" color="success" startIcon={<IconDownload size={16} />} onClick={() => downloadSigned(app.id)}>
-                      Download Surat
+                      Surat Bertandatangan
                     </Button>
                   )}
                   <Button size="small" variant="outlined" startIcon={<IconUsers size={16} />} onClick={() => viewApplicants(app.company_id, app.company_name)}>
