@@ -1,4 +1,8 @@
 import { useState } from 'react';
+import {
+  Box, Typography, Card, CardContent, Button, Alert, Stack, Divider,
+} from '@mui/material';
+import { IconDownload, IconUpload, IconUsers, IconUserCheck } from '@tabler/icons-react';
 import api from '../../lib/api';
 
 export default function AdminImport() {
@@ -35,68 +39,102 @@ export default function AdminImport() {
     }
   };
 
+  const ImportSection = ({ icon, title, type, file, setFile, hint }) => (
+    <Card sx={{ mb: 3 }}>
+      <CardContent>
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+          {icon}
+          <Typography variant="h4">{title}</Typography>
+        </Stack>
+        <Divider sx={{ mb: 2 }} />
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }}>
+          <Button
+            variant="outlined"
+            startIcon={<IconDownload size={18} />}
+            onClick={() => downloadTemplate(type)}
+          >
+            Template Excel
+          </Button>
+          <Button
+            variant="outlined"
+            component="label"
+            sx={{ flex: 1, justifyContent: 'flex-start', textTransform: 'none' }}
+          >
+            {file ? file.name : 'Pilih file Excel...'}
+            <input
+              type="file"
+              hidden
+              accept=".xlsx,.xls"
+              onChange={(e) => setFile(e.target.files[0])}
+            />
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<IconUpload size={18} />}
+            disabled={loading || !file}
+            onClick={() => importFile(type, file)}
+          >
+            {loading ? 'Memproses...' : 'Import'}
+          </Button>
+        </Stack>
+        <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
+          {hint}
+        </Typography>
+      </CardContent>
+    </Card>
+  );
+
   return (
-    <div>
-      <div className="page-header">
-        <h1>Import Data Master</h1>
-        <p>Upload data mahasiswa dan dosen secara massal dari Excel</p>
-      </div>
+    <Box>
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h2">Import Data Master</Typography>
+        <Typography variant="body2" color="text.secondary">
+          Upload data mahasiswa dan dosen secara massal dari Excel
+        </Typography>
+      </Box>
 
       {result && (
-        <div className={`alert ${result.error ? 'alert-error' : 'alert-success'}`}>
+        <Alert severity={result.error ? 'error' : 'success'} sx={{ mb: 3 }}>
           {result.error ? (
             <>Error: {result.error}</>
           ) : (
             <>
               Import {result.type} selesai: <strong>{result.success} sukses</strong>, {result.failed} gagal.
               {result.errors?.length > 0 && (
-                <ul style={{ marginTop: '10px', marginLeft: '20px' }}>
+                <Box component="ul" sx={{ mt: 1, ml: 2 }}>
                   {result.errors.slice(0, 5).map((e, i) => (
                     <li key={i}>{e.row}: {e.error}</li>
                   ))}
-                </ul>
+                </Box>
               )}
             </>
           )}
-        </div>
+        </Alert>
       )}
 
-      <div className="card">
-        <div className="card-header"><h2>📚 Import Mahasiswa</h2></div>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <button className="btn btn-secondary" onClick={() => downloadTemplate('students')}>
-            ⬇ Download Template Excel
-          </button>
-          <input type="file" accept=".xlsx,.xls" onChange={(e) => setStudentFile(e.target.files[0])} />
-          <button className="btn btn-primary" disabled={loading} onClick={() => importFile('students', studentFile)}>
-            {loading ? 'Memproses...' : 'Upload & Import'}
-          </button>
-        </div>
-        <p style={{ marginTop: '12px', fontSize: '0.85rem', color: '#64748b' }}>
-          Format: NIM, Nama, Email, Program Studi, Fakultas, Angkatan, Nomor HP, NIDN Pembimbing
-        </p>
-      </div>
+      <ImportSection
+        icon={<IconUsers size={24} color="#2196f3" />}
+        title="Import Mahasiswa"
+        type="students"
+        file={studentFile}
+        setFile={setStudentFile}
+        hint="Format: NIM, Nama, Email, Program Studi, Fakultas, Angkatan, Nomor HP, NIDN Pembimbing"
+      />
 
-      <div className="card">
-        <div className="card-header"><h2>👨‍🏫 Import Dosen</h2></div>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <button className="btn btn-secondary" onClick={() => downloadTemplate('lecturers')}>
-            ⬇ Download Template Excel
-          </button>
-          <input type="file" accept=".xlsx,.xls" onChange={(e) => setLecturerFile(e.target.files[0])} />
-          <button className="btn btn-primary" disabled={loading} onClick={() => importFile('lecturers', lecturerFile)}>
-            {loading ? 'Memproses...' : 'Upload & Import'}
-          </button>
-        </div>
-        <p style={{ marginTop: '12px', fontSize: '0.85rem', color: '#64748b' }}>
-          Format: NIDN, Nama, Email, Program Studi, Fakultas, Nomor HP
-        </p>
-      </div>
+      <ImportSection
+        icon={<IconUserCheck size={24} color="#673ab7" />}
+        title="Import Dosen"
+        type="lecturers"
+        file={lecturerFile}
+        setFile={setLecturerFile}
+        hint="Format: NIDN, Nama, Email, Program Studi, Fakultas, Nomor HP"
+      />
 
-      <div className="alert alert-info">
-        <strong>Catatan:</strong> Setelah import, akun otomatis dibuat dengan password sementara. User wajib mengganti password saat login pertama.
-        <br />Email pengiriman password belum dikonfigurasi - sementara password tersimpan di log database.
-      </div>
-    </div>
+      <Alert severity="info">
+        <strong>Catatan:</strong> Setelah import, akun otomatis dibuat dengan password sementara.
+        User wajib mengganti password saat login pertama. Email pengiriman password belum dikonfigurasi
+        — sementara password tersimpan di log database.
+      </Alert>
+    </Box>
   );
 }

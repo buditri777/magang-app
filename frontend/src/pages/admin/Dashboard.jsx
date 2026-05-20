@@ -1,5 +1,22 @@
 import { useQuery } from '@tanstack/react-query';
+import {
+  Box, Typography, Card, CardContent, Grid, Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow, Chip, Stack,
+} from '@mui/material';
+import { IconUsers, IconUserCheck, IconSchool, IconShieldCheck, IconAlertCircle } from '@tabler/icons-react';
 import api from '../../lib/api';
+
+const StatCard = ({ icon, label, value, color = 'primary.main' }) => (
+  <Card sx={{ borderLeft: '4px solid', borderColor: color }}>
+    <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+      <Box sx={{ color, display: 'flex' }}>{icon}</Box>
+      <Box>
+        <Typography variant="subtitle2" color="text.secondary">{label}</Typography>
+        <Typography variant="h3">{value}</Typography>
+      </Box>
+    </CardContent>
+  </Card>
+);
 
 export default function AdminDashboard() {
   const { data: usersData } = useQuery({
@@ -15,62 +32,79 @@ export default function AdminDashboard() {
   const users = usersData?.users || [];
   const stats = {
     total: users.length,
-    super_admin: users.filter(u => u.role === 'super_admin').length,
-    admin_upi: users.filter(u => u.role === 'admin_upi').length,
-    dosen: users.filter(u => u.role === 'dosen').length,
     mahasiswa: users.filter(u => u.role === 'mahasiswa').length,
+    dosen: users.filter(u => u.role === 'dosen').length,
+    admin_upi: users.filter(u => u.role === 'admin_upi').length,
     pending: users.filter(u => u.status === 'pending_activation' || u.status === 'must_change_password').length,
   };
 
   return (
-    <div>
-      <div className="page-header">
-        <h1>Dashboard Super Admin</h1>
-        <p>Ringkasan sistem manajemen magang</p>
-      </div>
+    <Box>
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h2">Dashboard Super Admin</Typography>
+        <Typography variant="body2" color="text.secondary">Ringkasan sistem manajemen magang</Typography>
+      </Box>
 
-      <div className="stats-grid">
-        <div className="stat-card"><div className="label">Total User</div><div className="value">{stats.total}</div></div>
-        <div className="stat-card"><div className="label">Mahasiswa</div><div className="value">{stats.mahasiswa}</div></div>
-        <div className="stat-card"><div className="label">Dosen</div><div className="value">{stats.dosen}</div></div>
-        <div className="stat-card"><div className="label">Admin UPI</div><div className="value">{stats.admin_upi}</div></div>
-        <div className="stat-card"><div className="label">Pending Activation</div><div className="value">{stats.pending}</div></div>
-      </div>
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+          <StatCard icon={<IconUsers size={28} />} label="Total User" value={stats.total} />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+          <StatCard icon={<IconSchool size={28} />} label="Mahasiswa" value={stats.mahasiswa} color="secondary.main" />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+          <StatCard icon={<IconUserCheck size={28} />} label="Dosen" value={stats.dosen} color="success.dark" />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+          <StatCard icon={<IconShieldCheck size={28} />} label="Admin UPI" value={stats.admin_upi} color="warning.dark" />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+          <StatCard icon={<IconAlertCircle size={28} />} label="Pending" value={stats.pending} color="error.main" />
+        </Grid>
+      </Grid>
 
-      <div className="card">
-        <div className="card-header"><h2>Riwayat Import Terakhir</h2></div>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Tanggal</th>
-                <th>Tipe</th>
-                <th>File</th>
-                <th>Total</th>
-                <th>Sukses</th>
-                <th>Gagal</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(jobsData?.jobs || []).slice(0, 10).map(job => (
-                <tr key={job.id}>
-                  <td>{new Date(job.created_at).toLocaleString('id-ID')}</td>
-                  <td>{job.type}</td>
-                  <td>{job.file_name}</td>
-                  <td>{job.total_rows}</td>
-                  <td><span className="badge badge-success">{job.success_rows}</span></td>
-                  <td>{job.failed_rows > 0 ? <span className="badge badge-danger">{job.failed_rows}</span> : '-'}</td>
-                  <td><span className="badge badge-info">{job.status}</span></td>
-                </tr>
-              ))}
-              {(!jobsData?.jobs || jobsData.jobs.length === 0) && (
-                <tr><td colSpan={7} className="empty-state">Belum ada riwayat import</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+      <Card>
+        <CardContent>
+          <Typography variant="h4" sx={{ mb: 2 }}>Riwayat Import Terakhir</Typography>
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Tanggal</TableCell>
+                  <TableCell>Tipe</TableCell>
+                  <TableCell>File</TableCell>
+                  <TableCell align="center">Total</TableCell>
+                  <TableCell align="center">Sukses</TableCell>
+                  <TableCell align="center">Gagal</TableCell>
+                  <TableCell>Status</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {(jobsData?.jobs || []).slice(0, 10).map(job => (
+                  <TableRow key={job.id} hover>
+                    <TableCell>{new Date(job.created_at).toLocaleString('id-ID')}</TableCell>
+                    <TableCell sx={{ textTransform: 'capitalize' }}>{job.type}</TableCell>
+                    <TableCell>{job.file_name}</TableCell>
+                    <TableCell align="center">{job.total_rows}</TableCell>
+                    <TableCell align="center"><Chip label={job.success_rows} size="small" color="success" /></TableCell>
+                    <TableCell align="center">
+                      {job.failed_rows > 0 ? <Chip label={job.failed_rows} size="small" color="error" /> : '-'}
+                    </TableCell>
+                    <TableCell><Chip label={job.status} size="small" color="info" /></TableCell>
+                  </TableRow>
+                ))}
+                {(!jobsData?.jobs || jobsData.jobs.length === 0) && (
+                  <TableRow>
+                    <TableCell colSpan={7} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                      Belum ada riwayat import
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </CardContent>
+      </Card>
+    </Box>
   );
 }
