@@ -18,6 +18,15 @@ const templateUpload = multer({
   dest: 'uploads/templates/',
   limits: { fileSize: 5 * 1024 * 1024 },
 });
+const loaUpload = multer({
+  dest: 'uploads/loa/',
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Hanya PDF, JPG, atau PNG yang diperbolehkan'));
+  },
+});
 
 // ============== MAHASISWA ENDPOINTS ==============
 
@@ -499,6 +508,118 @@ router.get('/:id/generate-letter', async (req, res) => {
     res.send(buffer);
   } catch (err) {
     console.error('Generate letter error:', err);
+    res.status(500).json({ error: 'Server error: ' + err.message });
+  }
+});
+
+// ============== LoA (Letter of Acceptance) ENDPOINTS ==============
+
+// POST /api/applications/:id/upload-loa - mahasiswa upload surat penerimaan magang
+router.post('/:id/upload-loa', requireRole('mahasiswa'), loaUpload.single('file'), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (!req.file) return res.status(400).json({ error: 'File tidak ditemukan' });
+
+    // Pastikan aplikasi milik mahasiswa ini
+    const student = await prisma.student.findUnique({ where: { profile_id: req.user.id } });
+    if (!student) {
+      fs.unlinkSync(req.file.path);
+      return res.status(403).json({ error: 'Profil mahasiswa tidak ditemukan' });
+    }
+
+    const app = await prisma.internshipApplication.findUnique({ where: { id } });
+    if (!app) {
+      fs.unlinkSync(req.file.path);
+      return res.status(404).json({ error: 'Pengajuan tidak ditemukan' });
+    }
+    if (app.student_id !== student.id) {
+      fs.unlinkSync(req.file.path);
+      return res.status(403).json({ error: 'Anda tidak memiliki akses ke pengajuan ini' });
+    }
+
+    // Hapus file LoA lama jika ada
+    if (app.loa_file_path && fs.existsSync(app.loa_file_path)) {
+      try { fs.unlinkSync(app.loa_file_path); } catch (e) { /* ignore */ }
+    }
+
+    await prisma.internshipApplication.update({
+      where: { id },
+      data: {
+        loa_file_path: req.file.path,
+        loa_file_name: req.file.originalname,
+        loa_uploaded_at: new Date(),
+      },
+    });
+
+    res.json({
+      message: 'Surat Penerimaan Magang (LoA) berhasil diupload',
+      file_name: req.file.originalname,
+      uploaded_at: new Date(),
+    });
+  } catch (err) {
+    if (req.file && fs.existsSync(req.file.path)) {
+      try { fs.unlinkSync(req.file.path); } catch (e) { /* ignore */ }
+    }
+    console.error('Upload LoA error:', err);
+    res.status(500).json({ error: 'Server error: ' + err.message });
+  }
+});
+
+// DELETE /api/applications/:id/loa - mahasiswa hapus LoA
+router.delete('/:id/loa', requireRole('mahasiswa'), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const student = await prisma.student.findUnique({ where: { profile_id: req.user.id } });
+    if (!student) return res.status(403).json({ error: 'Profil mahasiswa tidak ditemukan' });
+
+    const app = await prisma.internshipApplication.findUnique({ where: { id } });
+    if (!app) return res.status(404).json({ error: 'Pengajuan tidak ditemukan' });
+    if (app.student_id !== student.id) return res.status(403).json({ error: 'Akses ditolak' });
+
+    if (app.loa_file_path && fs.existsSync(app.loa_file_path)) {
+      try { fs.unlinkSync(app.loa_file_path); } catch (e) { /* ignore */ }
+    }
+
+    await prisma.internshipApplication.update({
+      where: { id },
+      data: { loa_file_path: null, loa_file_name: null, loa_uploaded_at: null },
+    });
+
+    res.json({ message: 'LoA berhasil dihapus' });
+  } catch (err) {
+    console.error('Delete LoA error:', err);
+    res.status(500).json({ error: 'Server error: ' + err.message });
+  }
+});
+
+// GET /api/applications/:id/download-loa - mahasiswa (own) atau admin_upi/super_admin (any)
+router.get('/:id/download-loa', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const app = await prisma.internshipApplication.findUnique({
+      where: { id },
+      include: { student: true },
+    });
+    if (!app) return res.status(404).json({ error: 'Pengajuan tidak ditemukan' });
+    if (!app.loa_file_path) return res.status(404).json({ error: 'Surat penerimaan magang belum diupload' });
+
+    // Authorization: own student OR admin_upi/super_admin
+    const isAdmin = ['admin_upi', 'super_admin'].includes(req.user.role);
+    let isOwner = false;
+    if (req.user.role === 'mahasiswa') {
+      const student = await prisma.student.findUnique({ where: { profile_id: req.user.id } });
+      isOwner = student && student.id === app.student_id;
+    }
+    if (!isAdmin && !isOwner) return res.status(403).json({ error: 'Akses ditolak' });
+
+    const filePath = path.resolve(app.loa_file_path);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File LoA tidak ditemukan di server' });
+
+    const ext = path.extname(app.loa_file_name || '').toLowerCase() || path.extname(filePath).toLowerCase();
+    const filename = `LoA_${app.id}${ext}`;
+    res.download(filePath, filename);
+  } catch (err) {
+    console.error('Download LoA error:', err);
     res.status(500).json({ error: 'Server error: ' + err.message });
   }
 });
