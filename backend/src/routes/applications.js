@@ -147,6 +147,36 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// PATCH /api/applications/:id/submit - mahasiswa submit draft (or re-submit)
+router.patch('/:id/submit', requireRole('mahasiswa'), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const student = await prisma.student.findUnique({ where: { profile_id: req.user.id } });
+    if (!student) return res.status(400).json({ error: 'Profile mahasiswa belum lengkap' });
+
+    const app = await prisma.internshipApplication.findUnique({ where: { id } });
+    if (!app) return res.status(404).json({ error: 'Pengajuan tidak ditemukan' });
+    if (app.student_id !== student.id) return res.status(403).json({ error: 'Akses ditolak' });
+    if (!['draft', 'revision'].includes(app.status)) {
+      return res.status(400).json({ error: 'Pengajuan tidak dalam status yang bisa disubmit' });
+    }
+
+    await prisma.internshipApplication.update({
+      where: { id },
+      data: { status: 'submitted', submitted_at: new Date() },
+    });
+
+    await prisma.auditLog.create({
+      data: { user_id: req.user.id, action: 'submit_application', entity_type: 'application', entity_id: id },
+    });
+
+    res.json({ message: 'Pengajuan berhasil disubmit', status: 'submitted' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // ============== ADMIN UPI ENDPOINTS ==============
 
 // GET /api/applications - admin list all
