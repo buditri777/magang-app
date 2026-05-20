@@ -75,11 +75,50 @@ export function createBerryTheme() {
     shape: { borderRadius },
     components: {
       MuiButton: {
+        defaultProps: {
+          disableElevation: true,
+        },
         styleOverrides: {
           root: {
             borderRadius: `${borderRadius}px`,
             boxShadow: 'none',
+            textTransform: 'capitalize',
+            fontWeight: 500,
+            paddingLeft: '16px',
+            paddingRight: '16px',
+            minHeight: '36px',
+            whiteSpace: 'nowrap',
             '&:hover': { boxShadow: 'none' },
+          },
+          sizeSmall: {
+            paddingLeft: '12px',
+            paddingRight: '12px',
+            minHeight: '32px',
+            fontSize: '0.8125rem',
+          },
+          sizeLarge: {
+            paddingLeft: '20px',
+            paddingRight: '20px',
+            minHeight: '44px',
+          },
+          contained: {
+            paddingLeft: '20px',
+            paddingRight: '20px',
+          },
+          containedSizeSmall: {
+            paddingLeft: '14px',
+            paddingRight: '14px',
+          },
+          startIcon: {
+            marginRight: '10px',
+            marginLeft: '-2px',
+            '& > *:nth-of-type(1)': {
+              fontSize: '18px',
+            },
+          },
+          endIcon: {
+            marginLeft: '10px',
+            marginRight: '-2px',
           },
         },
       },
