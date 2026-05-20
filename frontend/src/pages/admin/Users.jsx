@@ -1,25 +1,133 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useSnackbar } from 'notistack';
 import {
   Box, Typography, Card, CardContent, TextField, Select, MenuItem, FormControl,
   InputLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Chip, Button, Stack, InputAdornment, Dialog, DialogTitle, DialogContent,
-  DialogActions, Alert,
+  DialogActions, Alert, IconButton, Tooltip,
 } from '@mui/material';
-import { IconSearch, IconPlus } from '@tabler/icons-react';
+import { IconSearch, IconPlus, IconRefresh, IconCopy } from '@tabler/icons-react';
 import api from '../../lib/api';
+
+function CreateUserDialog({ open, onClose }) {
+  const queryClient = useQueryClient();
+  const [form, setForm] = useState({ email: '', full_name: '', role: 'mahasiswa', phone: '', nim: '', nidn: '', program_studi: '', fakultas: '', angkatan: '' });
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
+
+  const mutation = useMutation({
+    mutationFn: (data) => api.post('/admin/users', data),
+    onSuccess: (res) => {
+      setResult(res.data);
+      queryClient.invalidateQueries(['admin-users']);
+    },
+    onError: (err) => setError(err.response?.data?.error || 'Gagal membuat user'),
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setError('');
+    setResult(null);
+    const payload = { email: form.email, full_name: form.full_name, role: form.role, phone: form.phone || undefined };
+    if (form.role === 'mahasiswa') {
+      payload.nim = form.nim;
+      payload.program_studi = form.program_studi;
+      payload.fakultas = form.fakultas;
+      payload.angkatan = form.angkatan;
+    } else if (form.role === 'dosen') {
+      payload.nidn = form.nidn;
+      payload.program_studi = form.program_studi;
+      payload.fakultas = form.fakultas;
+    }
+    mutation.mutate(payload);
+  };
+
+  const handleClose = () => {
+    setForm({ email: '', full_name: '', role: 'mahasiswa', phone: '', nim: '', nidn: '', program_studi: '', fakultas: '', angkatan: '' });
+    setResult(null);
+    setError('');
+    onClose();
+  };
+
+  const copyPassword = () => {
+    if (result?.temp_password) {
+      navigator.clipboard.writeText(result.temp_password);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Tambah User Baru</DialogTitle>
+      <DialogContent>
+        {result ? (
+          <Alert severity="success" sx={{ mt: 1 }}>
+            <Typography variant="subtitle2">User berhasil dibuat!</Typography>
+            <Typography variant="body2">Email: <strong>{result.user.email}</strong></Typography>
+            <Typography variant="body2">Role: <strong>{result.user.role}</strong></Typography>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 1 }}>
+              <Typography variant="body2">Password sementara:</Typography>
+              <Chip label={result.temp_password} color="warning" size="small" />
+              <Tooltip title="Copy password">
+                <IconButton size="small" onClick={copyPassword}><IconCopy size={16} /></IconButton>
+              </Tooltip>
+            </Stack>
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+              Berikan password ini ke user. Mereka wajib ganti saat login pertama.
+            </Typography>
+          </Alert>
+        ) : (
+          <form id="create-user-form" onSubmit={handleSubmit}>
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              {error && <Alert severity="error">{error}</Alert>}
+              <TextField label="Nama Lengkap" value={form.full_name} onChange={(e) => setForm(f => ({ ...f, full_name: e.target.value }))} required fullWidth />
+              <TextField label="Email" type="email" value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))} required fullWidth placeholder="user@udb.ac.id" />
+              <TextField label="No. HP" value={form.phone} onChange={(e) => setForm(f => ({ ...f, phone: e.target.value }))} fullWidth placeholder="08xxxxxxxxxx" />
+              <FormControl fullWidth>
+                <InputLabel>Role</InputLabel>
+                <Select value={form.role} label="Role" onChange={(e) => setForm(f => ({ ...f, role: e.target.value }))}>
+                  <MenuItem value="mahasiswa">Mahasiswa</MenuItem>
+                  <MenuItem value="dosen">Dosen</MenuItem>
+                  <MenuItem value="admin_upi">Admin UPI</MenuItem>
+                  <MenuItem value="super_admin">Super Admin</MenuItem>
+                </Select>
+              </FormControl>
+
+              {form.role === 'mahasiswa' && (
+                <>
+                  <TextField label="NIM" value={form.nim} onChange={(e) => setForm(f => ({ ...f, nim: e.target.value }))} required fullWidth />
+                  <TextField label="Program Studi" value={form.program_studi} onChange={(e) => setForm(f => ({ ...f, program_studi: e.target.value }))} fullWidth />
+                  <TextField label="Fakultas" value={form.fakultas} onChange={(e) => setForm(f => ({ ...f, fakultas: e.target.value }))} fullWidth />
+                  <TextField label="Angkatan" type="number" value={form.angkatan} onChange={(e) => setForm(f => ({ ...f, angkatan: e.target.value }))} fullWidth placeholder="2021" />
+                </>
+              )}
+
+              {form.role === 'dosen' && (
+                <>
+                  <TextField label="NIDN" value={form.nidn} onChange={(e) => setForm(f => ({ ...f, nidn: e.target.value }))} required fullWidth />
+                  <TextField label="Program Studi" value={form.program_studi} onChange={(e) => setForm(f => ({ ...f, program_studi: e.target.value }))} fullWidth />
+                  <TextField label="Fakultas" value={form.fakultas} onChange={(e) => setForm(f => ({ ...f, fakultas: e.target.value }))} fullWidth />
+                </>
+              )}
+            </Stack>
+          </form>
+        )}
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={handleClose}>{result ? 'Tutup' : 'Batal'}</Button>
+        {!result && (
+          <Button type="submit" form="create-user-form" variant="contained" disabled={mutation.isPending}>
+            {mutation.isPending ? 'Menyimpan...' : 'Buat User'}
+          </Button>
+        )}
+      </DialogActions>
+    </Dialog>
+  );
+}
 
 export default function AdminUsers() {
   const queryClient = useQueryClient();
-  const { enqueueSnackbar } = useSnackbar();
   const [filters, setFilters] = useState({ role: '', status: '', search: '' });
-  const [openDialog, setOpenDialog] = useState(false);
-  const [tempPassword, setTempPassword] = useState('');
-  const [form, setForm] = useState({
-    email: '', full_name: '', role: '', phone: '',
-    nim: '', nidn: '', program_studi: '', fakultas: '', angkatan: '',
-  });
+  const [createOpen, setCreateOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-users', filters],
@@ -28,29 +136,12 @@ export default function AdminUsers() {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, ...body }) => api.patch(`/admin/users/${id}`, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['admin-users']);
-      enqueueSnackbar('User berhasil diupdate', { variant: 'success' });
-    },
-    onError: (err) => enqueueSnackbar(err.response?.data?.error || 'Gagal update user', { variant: 'error' }),
+    onSuccess: () => queryClient.invalidateQueries(['admin-users']),
   });
 
   const resetMutation = useMutation({
     mutationFn: (id) => api.post(`/admin/users/${id}/reset-password`),
-    onSuccess: (res) => {
-      enqueueSnackbar(`Password direset: ${res.data.temp_password}`, { variant: 'info', autoHideDuration: 10000 });
-    },
-    onError: (err) => enqueueSnackbar(err.response?.data?.error || 'Gagal reset password', { variant: 'error' }),
-  });
-
-  const createMutation = useMutation({
-    mutationFn: (data) => api.post('/admin/users', data),
-    onSuccess: (res) => {
-      queryClient.invalidateQueries(['admin-users']);
-      setTempPassword(res.data.temp_password);
-      enqueueSnackbar('User berhasil dibuat', { variant: 'success' });
-    },
-    onError: (err) => enqueueSnackbar(err.response?.data?.error || 'Gagal membuat user', { variant: 'error' }),
+    onSuccess: (res) => alert(`Password direset: ${res.data.temp_password}`),
   });
 
   const users = data?.users || [];
@@ -60,44 +151,22 @@ export default function AdminUsers() {
     return map[status] || 'default';
   };
 
-  const handleOpenDialog = () => {
-    setForm({ email: '', full_name: '', role: '', phone: '', nim: '', nidn: '', program_studi: '', fakultas: '', angkatan: '' });
-    setTempPassword('');
-    setOpenDialog(true);
-  };
-
-  const handleCloseDialog = () => {
-    setOpenDialog(false);
-    setTempPassword('');
-  };
-
-  const handleSubmit = () => {
-    if (!form.email || !form.full_name || !form.role) {
-      enqueueSnackbar('Email, Nama Lengkap, dan Role wajib diisi', { variant: 'warning' });
-      return;
-    }
-    const payload = { ...form };
-    if (payload.angkatan) payload.angkatan = parseInt(payload.angkatan);
-    // Remove empty optional fields
-    Object.keys(payload).forEach(k => { if (!payload[k]) delete payload[k]; });
-    createMutation.mutate(payload);
-  };
-
-  const handleFormChange = (field) => (e) => {
-    setForm(f => ({ ...f, [field]: e.target.value }));
+  const roleLabel = (role) => {
+    const map = { super_admin: 'Super Admin', admin_upi: 'Admin UPI', dosen: 'Dosen', mahasiswa: 'Mahasiswa' };
+    return map[role] || role;
   };
 
   return (
     <Box>
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
         <Box>
           <Typography variant="h2">Manajemen User</Typography>
-          <Typography variant="body2" color="text.secondary">Kelola akun pengguna sistem</Typography>
+          <Typography variant="body2" color="text.secondary">Kelola akun pengguna sistem ({users.length} user)</Typography>
         </Box>
-        <Button variant="contained" startIcon={<IconPlus size={18} />} onClick={handleOpenDialog}>
+        <Button variant="contained" startIcon={<IconPlus size={18} />} onClick={() => setCreateOpen(true)}>
           Tambah User
         </Button>
-      </Box>
+      </Stack>
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 3 }}>
         <TextField
@@ -152,7 +221,7 @@ export default function AdminUsers() {
                     <TableRow key={user.id} hover>
                       <TableCell sx={{ fontWeight: 500 }}>{user.full_name}</TableCell>
                       <TableCell>{user.email}</TableCell>
-                      <TableCell><Chip label={user.role} size="small" variant="outlined" /></TableCell>
+                      <TableCell><Chip label={roleLabel(user.role)} size="small" variant="outlined" /></TableCell>
                       <TableCell><Chip label={user.status} size="small" color={statusColor(user.status)} /></TableCell>
                       <TableCell>{new Date(user.created_at).toLocaleDateString('id-ID')}</TableCell>
                       <TableCell>
@@ -166,15 +235,17 @@ export default function AdminUsers() {
                               Aktifkan
                             </Button>
                           )}
-                          <Button size="small" variant="outlined" onClick={() => resetMutation.mutate(user.id)}>
-                            Reset PW
-                          </Button>
+                          <Tooltip title="Reset password user">
+                            <IconButton size="small" color="warning" onClick={() => resetMutation.mutate(user.id)}>
+                              <IconRefresh size={18} />
+                            </IconButton>
+                          </Tooltip>
                         </Stack>
                       </TableCell>
                     </TableRow>
                   ))}
                   {users.length === 0 && (
-                    <TableRow><TableCell colSpan={6} align="center" sx={{ py: 4, color: 'text.secondary' }}>Tidak ada user</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={6} align="center" sx={{ py: 4, color: 'text.secondary' }}>Tidak ada user ditemukan</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
@@ -183,90 +254,7 @@ export default function AdminUsers() {
         </CardContent>
       </Card>
 
-      {/* Dialog Tambah User */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>Tambah User Baru</DialogTitle>
-        <DialogContent>
-          {tempPassword && (
-            <Alert severity="success" sx={{ mb: 2 }}>
-              User berhasil dibuat! Password sementara: <strong>{tempPassword}</strong>
-              <br />
-              <Typography variant="caption">Salin password ini, tidak akan ditampilkan lagi.</Typography>
-            </Alert>
-          )}
-          {!tempPassword && (
-            <Stack spacing={2} sx={{ mt: 1 }}>
-              <TextField
-                label="Email" required fullWidth size="small"
-                value={form.email} onChange={handleFormChange('email')}
-              />
-              <TextField
-                label="Nama Lengkap" required fullWidth size="small"
-                value={form.full_name} onChange={handleFormChange('full_name')}
-              />
-              <FormControl fullWidth size="small" required>
-                <InputLabel>Role</InputLabel>
-                <Select value={form.role} label="Role" onChange={handleFormChange('role')}>
-                  <MenuItem value="super_admin">Super Admin</MenuItem>
-                  <MenuItem value="admin_upi">Admin UPI</MenuItem>
-                  <MenuItem value="dosen">Dosen</MenuItem>
-                  <MenuItem value="mahasiswa">Mahasiswa</MenuItem>
-                </Select>
-              </FormControl>
-              <TextField
-                label="Nomor HP" fullWidth size="small"
-                value={form.phone} onChange={handleFormChange('phone')}
-              />
-
-              {form.role === 'mahasiswa' && (
-                <>
-                  <TextField
-                    label="NIM" fullWidth size="small"
-                    value={form.nim} onChange={handleFormChange('nim')}
-                  />
-                  <TextField
-                    label="Program Studi" fullWidth size="small"
-                    value={form.program_studi} onChange={handleFormChange('program_studi')}
-                  />
-                  <TextField
-                    label="Fakultas" fullWidth size="small"
-                    value={form.fakultas} onChange={handleFormChange('fakultas')}
-                  />
-                  <TextField
-                    label="Angkatan" fullWidth size="small" type="number"
-                    value={form.angkatan} onChange={handleFormChange('angkatan')}
-                  />
-                </>
-              )}
-
-              {form.role === 'dosen' && (
-                <>
-                  <TextField
-                    label="NIDN" fullWidth size="small"
-                    value={form.nidn} onChange={handleFormChange('nidn')}
-                  />
-                  <TextField
-                    label="Program Studi" fullWidth size="small"
-                    value={form.program_studi} onChange={handleFormChange('program_studi')}
-                  />
-                  <TextField
-                    label="Fakultas" fullWidth size="small"
-                    value={form.fakultas} onChange={handleFormChange('fakultas')}
-                  />
-                </>
-              )}
-            </Stack>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>{tempPassword ? 'Tutup' : 'Batal'}</Button>
-          {!tempPassword && (
-            <Button variant="contained" onClick={handleSubmit} disabled={createMutation.isPending}>
-              {createMutation.isPending ? 'Menyimpan...' : 'Simpan'}
-            </Button>
-          )}
-        </DialogActions>
-      </Dialog>
+      <CreateUserDialog open={createOpen} onClose={() => setCreateOpen(false)} />
     </Box>
   );
 }
