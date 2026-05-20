@@ -6,6 +6,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const prisma = require('../db/prisma');
 const { verifyToken, requireRole } = require('../middleware/auth');
+const { sendMail, welcomeEmail, resetPasswordEmail } = require('../lib/email');
 
 const router = express.Router();
 
@@ -113,6 +114,10 @@ router.post('/users', async (req, res) => {
     });
 
     res.status(201).json({ user: { id: profile.id, email, full_name, role }, temp_password: tempPassword });
+
+    // Fire-and-forget email
+    sendMail({ to: email, ...welcomeEmail({ name: full_name, email, tempPassword }) })
+      .catch(e => console.error('welcome email failed:', e.message));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -158,7 +163,7 @@ router.post('/users/:id/reset-password', async (req, res) => {
     const user = await prisma.profile.update({
       where: { id },
       data: { password_hash: hash, status: 'must_change_password' },
-      select: { email: true },
+      select: { email: true, full_name: true },
     });
 
     await prisma.userProvisioningLog.create({
@@ -171,6 +176,10 @@ router.post('/users/:id/reset-password', async (req, res) => {
     });
 
     res.json({ message: 'Password direset', temp_password: tempPassword });
+
+    // Fire-and-forget email
+    sendMail({ to: user.email, ...resetPasswordEmail({ name: user.full_name || user.email, email: user.email, tempPassword }) })
+      .catch(e => console.error('reset email failed:', e.message));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

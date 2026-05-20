@@ -404,4 +404,103 @@ router.post('/templates/upload', requireRole('admin_upi'), templateUpload.single
   }
 });
 
+// ============== LETTER GENERATION ==============
+
+const { generateSingleLetter, generateMultiLetter, formatPeriod } = require('../lib/letterGenerator');
+
+// GET /api/applications/:id/generate-letter
+// Generate .docx for an approved application (admin_upi/super_admin/mahasiswa-owner)
+router.get('/:id/generate-letter', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const app = await prisma.internshipApplication.findUnique({
+      where: { id },
+      include: {
+        student: {
+          include: { profile: { select: { full_name: true } } },
+        },
+        company: true,
+      },
+    });
+    if (!app) return res.status(404).json({ error: 'Pengajuan tidak ditemukan' });
+
+    // Permission check
+    if (req.user.role === 'mahasiswa') {
+      const myStudent = await prisma.student.findUnique({ where: { profile_id: req.user.id } });
+      if (!myStudent || myStudent.id !== app.student_id) {
+        return res.status(403).json({ error: 'Akses ditolak' });
+      }
+    }
+
+    if (!['approved', 'letter_generated', 'signed', 'completed'].includes(app.status)) {
+      return res.status(400).json({ error: 'Pengajuan belum disetujui' });
+    }
+
+    // For "B" template (multi), find all sibling applications in same batch
+    let buffer;
+    let filename;
+    if (app.template_type === 'B' && app.batch_key) {
+      const siblings = await prisma.internshipApplication.findMany({
+        where: { batch_key: app.batch_key, status: { in: ['approved', 'letter_generated', 'signed', 'completed'] } },
+        include: {
+          student: { include: { profile: { select: { full_name: true } } } },
+        },
+        orderBy: { id: 'asc' },
+      });
+
+      buffer = generateMultiLetter({
+        letterNumber: app.letter_number,
+        recipientTitle: `Pimpinan ${app.company.name}`,
+        companyAddress: app.company.address || app.company.city || '',
+        students: siblings.map(s => ({
+          name: s.student.profile.full_name,
+          number: s.student.nim,
+          program: s.student.program_studi || '-',
+        })),
+        internshipRole: app.position || app.division || 'Magang',
+        internshipPeriod: formatPeriod(app.start_date, app.end_date),
+      });
+      filename = `Surat_Magang_${app.company.name.replace(/\s+/g, '_')}_${app.batch_key}.docx`;
+    } else {
+      buffer = generateSingleLetter({
+        letterNumber: app.letter_number,
+        recipientTitle: `Pimpinan ${app.company.name}`,
+        companyAddress: app.company.address || app.company.city || '',
+        studentName: app.student.profile.full_name,
+        studentNumber: app.student.nim,
+        studentProgram: app.student.program_studi || '-',
+        internshipRole: app.position || app.division || 'Magang',
+        internshipPeriod: formatPeriod(app.start_date, app.end_date),
+      });
+      filename = `Surat_Magang_${app.student.nim}.docx`;
+    }
+
+    // Update status to letter_generated if still approved
+    if (app.status === 'approved') {
+      await prisma.internshipApplication.update({
+        where: { id },
+        data: { status: 'letter_generated' },
+      });
+      // Save record
+      const existing = await prisma.generatedLetter.findUnique({ where: { application_id: id } });
+      if (!existing) {
+        await prisma.generatedLetter.create({
+          data: {
+            application_id: id,
+            letter_number: app.letter_number,
+            generated_at: new Date(),
+          },
+        });
+      }
+    }
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (err) {
+    console.error('Generate letter error:', err);
+    res.status(500).json({ error: 'Server error: ' + err.message });
+  }
+});
+
 module.exports = router;
