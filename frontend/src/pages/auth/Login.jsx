@@ -1,5 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  Box, Card, CardContent, Typography, TextField, Button, Alert, Stack, Avatar,
+} from '@mui/material';
+import { IconSchool } from '@tabler/icons-react';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function Login() {
@@ -29,43 +33,68 @@ export default function Login() {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <h1>Magang UPI</h1>
-        <p className="subtitle">Sistem Manajemen Magang Mahasiswa</p>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #1565c0 0%, #2196f3 50%, #673ab7 100%)',
+        p: 2,
+      }}
+    >
+      <Card sx={{ maxWidth: 440, width: '100%', borderRadius: 3 }}>
+        <CardContent sx={{ p: { xs: 3, sm: 5 } }}>
+          <Stack alignItems="center" spacing={1} sx={{ mb: 4 }}>
+            <Avatar sx={{ bgcolor: 'primary.main', width: 56, height: 56 }}>
+              <IconSchool size={30} />
+            </Avatar>
+            <Typography variant="h2" textAlign="center">Magang UDB</Typography>
+            <Typography variant="body2" color="text.secondary" textAlign="center">
+              Sistem Manajemen Magang Mahasiswa
+            </Typography>
+          </Stack>
 
-        {error && <div className="alert alert-error">{error}</div>}
+          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              placeholder="email@upi.edu"
-            />
-          </div>
-          <div className="form-group">
-            <label>Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              placeholder="••••••••"
-            />
-          </div>
-          <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
-            {loading ? 'Memproses...' : 'Login'}
-          </button>
-        </form>
+          <form onSubmit={handleSubmit}>
+            <Stack spacing={2.5}>
+              <TextField
+                label="Email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                fullWidth
+                placeholder="email@udb.ac.id"
+              />
+              <TextField
+                label="Password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                fullWidth
+                placeholder="••••••••"
+              />
+              <Button
+                type="submit"
+                variant="contained"
+                size="large"
+                fullWidth
+                disabled={loading}
+                sx={{ py: 1.5 }}
+              >
+                {loading ? 'Memproses...' : 'Login'}
+              </Button>
+            </Stack>
+          </form>
 
-        <p style={{ marginTop: '20px', textAlign: 'center', fontSize: '0.85rem', color: '#64748b' }}>
-          Lupa password? Hubungi admin sistem.
-        </p>
-      </div>
-    </div>
+          <Typography variant="caption" color="text.secondary" textAlign="center" display="block" sx={{ mt: 3 }}>
+            Lupa password? Hubungi admin sistem.
+          </Typography>
+        </CardContent>
+      </Card>
+    </Box>
   );
 }

@@ -1,5 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  Box, Card, CardContent, Typography, TextField, Button, Alert, Stack, Avatar,
+} from '@mui/material';
+import { IconLock } from '@tabler/icons-react';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../lib/api';
 
@@ -39,47 +43,71 @@ export default function ChangePassword() {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <h1>Ganti Password</h1>
-        <p className="subtitle">Anda wajib mengganti password sebelum melanjutkan.</p>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #1565c0 0%, #2196f3 50%, #673ab7 100%)',
+        p: 2,
+      }}
+    >
+      <Card sx={{ maxWidth: 440, width: '100%', borderRadius: 3 }}>
+        <CardContent sx={{ p: { xs: 3, sm: 5 } }}>
+          <Stack alignItems="center" spacing={1} sx={{ mb: 4 }}>
+            <Avatar sx={{ bgcolor: 'warning.dark', width: 56, height: 56 }}>
+              <IconLock size={30} />
+            </Avatar>
+            <Typography variant="h2" textAlign="center">Ganti Password</Typography>
+            <Typography variant="body2" color="text.secondary" textAlign="center">
+              Anda wajib mengganti password sebelum melanjutkan.
+            </Typography>
+          </Stack>
 
-        {error && <div className="alert alert-error">{error}</div>}
+          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Password Saat Ini</label>
-            <input
-              type="password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label>Password Baru (min. 8 karakter)</label>
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              required
-              minLength={8}
-            />
-          </div>
-          <div className="form-group">
-            <label>Konfirmasi Password Baru</label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-            />
-          </div>
-          <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
-            {loading ? 'Menyimpan...' : 'Simpan Password Baru'}
-          </button>
-        </form>
-      </div>
-    </div>
+          <form onSubmit={handleSubmit}>
+            <Stack spacing={2.5}>
+              <TextField
+                label="Password Saat Ini"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                required
+                fullWidth
+              />
+              <TextField
+                label="Password Baru (min. 8 karakter)"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+                fullWidth
+                inputProps={{ minLength: 8 }}
+              />
+              <TextField
+                label="Konfirmasi Password Baru"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                fullWidth
+              />
+              <Button
+                type="submit"
+                variant="contained"
+                size="large"
+                fullWidth
+                disabled={loading}
+                sx={{ py: 1.5 }}
+              >
+                {loading ? 'Menyimpan...' : 'Simpan Password Baru'}
+              </Button>
+            </Stack>
+          </form>
+        </CardContent>
+      </Card>
+    </Box>
   );
 }
