@@ -6,7 +6,7 @@ import {
   Chip, Button, Stack, InputAdornment, Dialog, DialogTitle, DialogContent,
   DialogActions, Alert, IconButton, Tooltip, Grid,
 } from '@mui/material';
-import { IconSearch, IconEye, IconCheck, IconX, IconFileDownload } from '@tabler/icons-react';
+import { IconSearch, IconEye, IconCheck, IconX, IconFileDownload, IconFile } from '@tabler/icons-react';
 import { useSnackbar } from 'notistack';
 import api from '../../lib/api';
 
@@ -103,6 +103,50 @@ function ReviewDialog({ open, onClose, application }) {
               </Alert>
             </Grid>
           )}
+
+          {/* LoA Status */}
+          <Grid size={{ xs: 12 }}>
+            <Box sx={{
+              mt: 1,
+              p: 2,
+              bgcolor: application.loa_file_name ? 'success.50' : 'grey.50',
+              borderRadius: 2,
+              border: 1,
+              borderColor: application.loa_file_name ? 'success.200' : 'grey.300',
+            }}>
+              <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1}>
+                <Box>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                    Surat Penerimaan Magang (LoA)
+                  </Typography>
+                  {application.loa_file_name ? (
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <IconFile size={16} />
+                      <Typography variant="body2">{application.loa_file_name}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        • Diupload {new Date(application.loa_uploaded_at).toLocaleDateString('id-ID')}
+                      </Typography>
+                    </Stack>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      Mahasiswa belum mengupload surat penerimaan dari perusahaan
+                    </Typography>
+                  )}
+                </Box>
+                {application.loa_file_name && (
+                  <Button
+                    size="small"
+                    variant="contained"
+                    color="success"
+                    startIcon={<IconFileDownload size={16} />}
+                    onClick={() => window.open(`/api/applications/${application.id}/download-loa`, '_blank')}
+                  >
+                    Lihat LoA
+                  </Button>
+                )}
+              </Stack>
+            </Box>
+          </Grid>
         </Grid>
 
         {canReview && (
@@ -222,6 +266,7 @@ export default function AdminUpiApplications() {
                     <TableCell>Posisi</TableCell>
                     <TableCell>Periode</TableCell>
                     <TableCell>Status</TableCell>
+                    <TableCell>LoA</TableCell>
                     <TableCell>Aksi</TableCell>
                   </TableRow>
                 </TableHead>
@@ -237,6 +282,24 @@ export default function AdminUpiApplications() {
                       </TableCell>
                       <TableCell><Chip label={statusLabel(app.status)} color={statusColor(app.status)} size="small" /></TableCell>
                       <TableCell>
+                        {app.loa_file_name ? (
+                          <Tooltip title={`${app.loa_file_name} • ${new Date(app.loa_uploaded_at).toLocaleDateString('id-ID')}`}>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="success"
+                              startIcon={<IconFileDownload size={14} />}
+                              onClick={() => window.open(`/api/applications/${app.id}/download-loa`, '_blank')}
+                              sx={{ minWidth: 0, px: 1.5 }}
+                            >
+                              Lihat
+                            </Button>
+                          </Tooltip>
+                        ) : (
+                          <Chip label="Belum upload" size="small" variant="outlined" color="default" />
+                        )}
+                      </TableCell>
+                      <TableCell>
                         <Tooltip title="Lihat detail">
                           <IconButton size="small" onClick={() => setSelected(app)}>
                             <IconEye size={18} />
@@ -246,7 +309,7 @@ export default function AdminUpiApplications() {
                     </TableRow>
                   ))}
                   {applications.length === 0 && (
-                    <TableRow><TableCell colSpan={7} align="center" sx={{ py: 4, color: 'text.secondary' }}>Belum ada pengajuan magang</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} align="center" sx={{ py: 4, color: 'text.secondary' }}>Belum ada pengajuan magang</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
