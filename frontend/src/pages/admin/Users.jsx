@@ -170,12 +170,23 @@ export default function AdminUsers() {
 
   return (
     <Box>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-        <Box>
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        justifyContent="space-between"
+        alignItems={{ xs: 'flex-start', sm: 'center' }}
+        spacing={2}
+        sx={{ mb: 3 }}
+      >
+        <Box sx={{ minWidth: 0, flex: 1 }}>
           <Typography variant="h2">Manajemen User</Typography>
           <Typography variant="body2" color="text.secondary">Kelola akun pengguna sistem ({users.length} user)</Typography>
         </Box>
-        <Button variant="contained" startIcon={<IconPlus size={18} />} onClick={() => setCreateOpen(true)}>
+        <Button
+          variant="contained"
+          startIcon={<IconPlus size={18} />}
+          onClick={() => setCreateOpen(true)}
+          sx={{ flexShrink: 0, alignSelf: { xs: 'stretch', sm: 'center' } }}
+        >
           Tambah User
         </Button>
       </Stack>

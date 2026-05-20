@@ -75,9 +75,20 @@ export default function MahasiswaDashboard() {
 
       <Card>
         <CardContent>
-          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            justifyContent="space-between"
+            alignItems={{ xs: 'flex-start', sm: 'center' }}
+            spacing={2}
+            sx={{ mb: 2 }}
+          >
             <Typography variant="h4">Pengajuan Terbaru</Typography>
-            <Button variant="contained" startIcon={<IconPlus size={18} />} onClick={() => navigate('/mahasiswa/apply')}>
+            <Button
+              variant="contained"
+              startIcon={<IconPlus size={18} />}
+              onClick={() => navigate('/mahasiswa/apply')}
+              sx={{ flexShrink: 0, alignSelf: { xs: 'stretch', sm: 'center' } }}
+            >
               Ajukan Magang Baru
             </Button>
           </Stack>
