@@ -7,7 +7,7 @@ import {
 } from '@mui/material';
 import {
   IconDashboard, IconUsers, IconUpload, IconClipboardList, IconPencil,
-  IconHistory, IconMenu2, IconLogout, IconSchool,
+  IconHistory, IconMenu2, IconLogout, IconSchool, IconSettings,
 } from '@tabler/icons-react';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -18,6 +18,7 @@ const menuItems = {
     { path: '/admin', label: 'Dashboard', icon: <IconDashboard size={20} />, end: true },
     { path: '/admin/users', label: 'Manajemen User', icon: <IconUsers size={20} /> },
     { path: '/admin/import', label: 'Import Data', icon: <IconUpload size={20} /> },
+    { path: '/admin/settings', label: 'Pengaturan', icon: <IconSettings size={20} /> },
   ],
   admin_upi: [
     { path: '/admin-upi', label: 'Dashboard', icon: <IconDashboard size={20} />, end: true },

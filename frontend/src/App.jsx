@@ -7,6 +7,7 @@ import Layout from './components/layout/Layout';
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminUsers from './pages/admin/Users';
 import AdminImport from './pages/admin/Import';
+import AdminSettings from './pages/admin/Settings';
 import MahasiswaDashboard from './pages/mahasiswa/Dashboard';
 import MahasiswaApply from './pages/mahasiswa/Apply';
 import MahasiswaApplications from './pages/mahasiswa/Applications';
@@ -52,6 +53,7 @@ function App() {
               <Route index element={<AdminDashboard />} />
               <Route path="users" element={<AdminUsers />} />
               <Route path="import" element={<AdminImport />} />
+              <Route path="settings" element={<AdminSettings />} />
             </Route>
 
             {/* Admin UPI */}

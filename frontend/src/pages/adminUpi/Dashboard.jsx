@@ -6,6 +6,7 @@ import {
 } from '@mui/material';
 import { IconClipboardList, IconCheck, IconX, IconClock, IconFileText } from '@tabler/icons-react';
 import api from '../../lib/api';
+import { PeriodCard, InternshipFlowCard } from '../../components/shared/SettingsCards';
 
 const StatCard = ({ icon, label, value, color = 'primary.main' }) => (
   <Card sx={{ borderLeft: '4px solid', borderColor: color }}>
@@ -40,8 +41,10 @@ export default function AdminUpiDashboard() {
     <Box>
       <Box sx={{ mb: 3 }}>
         <Typography variant="h2">Dashboard Admin UPI</Typography>
-        <Typography variant="body2" color="text.secondary">Manajemen pengajuan surat pengantar magang</Typography>
+        <Typography variant="body2" color="text.secondary">Kelola pengajuan magang mahasiswa</Typography>
       </Box>
+
+      <Box sx={{ mb: 3 }}><PeriodCard /></Box>
 
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
@@ -107,6 +110,8 @@ export default function AdminUpiDashboard() {
           )}
         </CardContent>
       </Card>
+
+      <Box sx={{ mt: 3 }}><InternshipFlowCard /></Box>
     </Box>
   );
 }

@@ -32,6 +32,7 @@ app.use('/api/admin', require('./routes/admin'));
 app.use('/api/companies', require('./routes/companies'));
 app.use('/api/applications', require('./routes/applications'));
 app.use('/api/dosen', require('./routes/dosen'));
+app.use('/api/settings', require('./routes/settings'));
 
 // Error handler
 app.use((err, req, res, next) => {

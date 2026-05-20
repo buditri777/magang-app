@@ -7,6 +7,7 @@ import {
 import { IconClipboardList, IconClock, IconCheck, IconX, IconPlus } from '@tabler/icons-react';
 import api from '../../lib/api';
 import { useAuth } from '../../hooks/useAuth';
+import { PeriodCard, InternshipFlowCard } from '../../components/shared/SettingsCards';
 
 const statusMap = {
   draft: { label: 'Draft', color: 'default' },
@@ -54,6 +55,8 @@ export default function MahasiswaDashboard() {
         <Typography variant="h2">Halo, {user?.full_name} 👋</Typography>
         <Typography variant="body2" color="text.secondary">Selamat datang di Sistem Manajemen Magang UDB</Typography>
       </Box>
+
+      <Box sx={{ mb: 3 }}><PeriodCard /></Box>
 
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -114,6 +117,8 @@ export default function MahasiswaDashboard() {
           )}
         </CardContent>
       </Card>
+
+      <Box sx={{ mt: 3 }}><InternshipFlowCard /></Box>
     </Box>
   );
 }

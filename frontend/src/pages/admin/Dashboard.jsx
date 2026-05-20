@@ -5,6 +5,7 @@ import {
 } from '@mui/material';
 import { IconUsers, IconUserCheck, IconSchool, IconShieldCheck, IconAlertCircle } from '@tabler/icons-react';
 import api from '../../lib/api';
+import { PeriodCard, InternshipFlowCard } from '../../components/shared/SettingsCards';
 
 const StatCard = ({ icon, label, value, color = 'primary.main' }) => (
   <Card sx={{ borderLeft: '4px solid', borderColor: color }}>
@@ -44,6 +45,8 @@ export default function AdminDashboard() {
         <Typography variant="h2">Dashboard Super Admin</Typography>
         <Typography variant="body2" color="text.secondary">Ringkasan sistem manajemen magang</Typography>
       </Box>
+
+      <Box sx={{ mb: 3 }}><PeriodCard /></Box>
 
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
@@ -105,6 +108,8 @@ export default function AdminDashboard() {
           </TableContainer>
         </CardContent>
       </Card>
+
+      <Box sx={{ mt: 3 }}><InternshipFlowCard /></Box>
     </Box>
   );
 }

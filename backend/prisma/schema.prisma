@@ -234,3 +234,12 @@ model AuditLog {
   @@index([action], map: "idx_audit_action")
   @@map("audit_logs")
 }
+
+model AppSetting {
+  key        String   @id @db.VarChar(100)
+  value      String   @db.Text
+  label      String?  @db.VarChar(255)
+  updated_at DateTime @updatedAt
+
+  @@map("app_settings")
+}

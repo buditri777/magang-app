@@ -5,6 +5,7 @@ import {
 } from '@mui/material';
 import { IconUsers, IconClipboard, IconCircleCheck, IconClock } from '@tabler/icons-react';
 import api from '../../lib/api';
+import { PeriodCard, InternshipFlowCard } from '../../components/shared/SettingsCards';
 
 const statusColor = (s) => {
   const map = { draft: 'default', submitted: 'info', under_review: 'warning', approved: 'success', rejected: 'error', letter_generated: 'primary', signed: 'secondary', completed: 'success' };
@@ -55,6 +56,8 @@ export default function DosenDashboard() {
         <Typography variant="h2">Dashboard Dosen Pembimbing</Typography>
         <Typography variant="body2" color="text.secondary">Kelola dan pantau magang mahasiswa bimbingan</Typography>
       </Box>
+
+      <Box sx={{ mb: 3 }}><PeriodCard /></Box>
 
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -148,6 +151,8 @@ export default function DosenDashboard() {
           </Card>
         </Grid>
       </Grid>
+
+      <Box sx={{ mt: 3 }}><InternshipFlowCard /></Box>
     </Box>
   );
 }
